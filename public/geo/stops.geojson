@@ -1,0 +1,509 @@
+{
+  "type": "FeatureCollection",
+  "features": [
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 1
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.946261,
+          44.406564
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 2
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.945156,
+          44.406246
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 3
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.944432,
+          44.404893
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 4
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.941543,
+          44.405455
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 5
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.937759,
+          44.406375
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 6
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.934309,
+          44.407478
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 7
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.927035,
+          44.414556
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 8
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.922218,
+          44.416743
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 9
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.948214,
+          44.39542
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 10
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.944051,
+          44.396677
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 11
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.944588,
+          44.39786
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 12
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.94528,
+          44.39942
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 13
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.945178,
+          44.404571
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 14
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.9352,
+          44.405704
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 15
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.941353,
+          44.402394
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 16
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.944008,
+          44.401355
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 17
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.944523,
+          44.3991
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 18
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.944352,
+          44.396079
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 19
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.946798,
+          44.413844
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 20
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.944813,
+          44.41297
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 21
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.941653,
+          44.41159
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 22
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.938255,
+          44.410318
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 23
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.938397,
+          44.408848
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 24
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.936611,
+          44.407005
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 25
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.937166,
+          44.409582
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 26
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.938523,
+          44.409925
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 27
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.940248,
+          44.410894
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 28
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.945532,
+          44.413211
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 29
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.921596,
+          44.415417
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 30
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.925941,
+          44.41344
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 31
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.928323,
+          44.413624
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 32
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.934932,
+          44.410327
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 33
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.93402,
+          44.407974
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 34
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.939095,
+          44.405958
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 35
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.941509,
+          44.405368
+        ]
+      }
+    },
+    {
+      "type": "Feature",
+      "properties": {
+        "kind": "stop",
+        "stop_id": 36
+      },
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          8.944813,
+          44.405421
+        ]
+      }
+    }
+  ]
+}

@@ -1,0 +1,42 @@
+.run-tab__label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.run-tab__status-icon {
+  font-size: 18px;
+  width: 18px;
+  height: 18px;
+  opacity: 0.9;
+}
+
+.run-tab__title {
+  font-weight: 600;
+}
+
+.run-tab__time {
+  opacity: 0.75;
+  font-size: 12px;
+}
+
+.run-tab__badge {
+  font-size: 11px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  line-height: 16px;
+  opacity: 0.9;
+}
+
+/* classi per stato  */
+.run-tab__badge--pending { border: 1px solid rgba(0,0,0,0.25);  }
+.run-tab__badge--live { border: 1px solid rgba(53, 253, 3, 0.534); color:rgba(53, 253, 3, 0.534); }
+.run-tab__badge--finished { border: 1px solid rgba(0,0,0,0.25); }
+.run-tab__badge--stopped { border: 1px solid rgba(255, 3, 3, 0.642); color: rgba(255, 3, 3, 0.642); }
+.run-tab__badge--error { border: 1px solid rgba(255, 3, 3, 0.642); color: rgba(255, 3, 3, 0.642); }
+
+.run-tab__close {
+  width: 28px;
+  height: 28px;
+  line-height: 28px;
+}

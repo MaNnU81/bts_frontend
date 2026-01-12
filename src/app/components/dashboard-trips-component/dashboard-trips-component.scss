@@ -1,0 +1,49 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard__title {
+  margin: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dashboard__field {
+  width: 90%;
+  padding: 8px;
+}
+
+.dashboard__actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px;
+}
+
+.dashboard__mode-label {
+  margin-top: 0px;
+}
+.dashboard__mode {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 4px 8px;
+}
+
+.dashboard__mode-label {
+  font-size: 0.85rem;
+  font-weight: 500;
+  color: rgba(0, 0, 0, 0.7);
+}
+
+.dashboard__mode-options {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+}
+
+.dashboard__delay-field {
+  width: 90%;
+  padding: 0 8px 4px 8px;
+}

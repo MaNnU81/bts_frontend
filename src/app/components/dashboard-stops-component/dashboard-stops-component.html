@@ -1,0 +1,52 @@
+<section class="dashboard">
+  <h2 class="dashboard__title">Seleziona la fermata</h2>
+
+  <!-- Select LINEA -->
+  <mat-form-field appearance="outline" class="dashboard__field">
+    <mat-label>Linea</mat-label>
+
+    <mat-select
+      [value]="selectedLineId"
+      (valueChange)="onLineChange($event)">
+      @for (line of linesWithStops; track line.lineId) {
+        <mat-option [value]="line.lineId">
+          {{ line.lineLabel }}
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <!-- Select FERMATA -->
+  <mat-form-field appearance="outline" class="dashboard__field">
+    <mat-label>Fermata</mat-label>
+
+    <mat-select
+      [disabled]="stopsForSelectedLine.length === 0"
+      [value]="selectedStopId"
+      (valueChange)="onStopChange($event)">
+
+      @for (stop of stopsForSelectedLine; track stop.stopId) {
+        <mat-option [value]="stop.stopId">
+          {{ stop.stopName }}
+        </mat-option>
+      }
+    </mat-select>
+  </mat-form-field>
+
+  <div class="dashboard__actions">
+    <button
+      matButton="elevated"
+      color="primary"
+      [disabled]="selectedStopId == null"
+      (click)="onConfirmClick()">
+      Seleziona fermata
+    </button>
+
+    <button
+      matButton="elevated"
+      color="warn"
+      (click)="onClearClick()">
+      Pulisci selezione
+    </button>
+  </div>
+</section>

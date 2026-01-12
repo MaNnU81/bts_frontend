@@ -1,0 +1,86 @@
+<mat-card class="timeline-card">
+
+  @if (tripPosition; as trip) {
+
+  <mat-card-header>
+    <mat-card-title>{{ trip.lineName }}</mat-card-title>
+    <mat-card-subtitle>
+      Orario simulazione: {{ trip.currentTime }}
+    </mat-card-subtitle>
+  </mat-card-header>
+
+  <mat-card-content>
+
+    <div class="timeline">
+
+      <!-- linea di sfondo -->
+      <div class="timeline__track">
+        <div class="timeline__track-fill" [style.width.%]="progressTotalPercent">
+        </div>
+      </div>
+
+      
+      <!-- bus che scorre sulla linea -->
+      <div class="timeline__bus" [style.left.%]="progressTotalPercent">
+        <mat-icon fontIcon="directions_bus"></mat-icon>
+      </div>
+
+      <!-- marker delle fermate -->
+<div class="timeline__markers">
+  @for (stop of trip.stops; let i = $index; let count = $count; track stop.sequence) {
+
+    <div
+      class="timeline__marker"
+      [class.timeline__marker--past]="isPast(stop.sequence)"
+      [class.timeline__marker--current]="isCurrent(stop.sequence)"
+      [class.timeline__marker--next]="isNext(stop.sequence)"
+      [class.timeline__marker--selected]="stop.stopId === selectedStopId"
+      [style.left.%]="getMarkerLeftPercent(i, count)"
+      (click)="onStopClick(stop.stopId)"
+    >
+
+      @if (getLineNumbersForStop(stop.stopId).length > 0) {
+        <div class="timeline__lines">
+          @for (num of getLineNumbersForStop(stop.stopId); track num) {
+            <span class="timeline__badge">
+              {{ num }}
+            </span>
+          }
+        </div>
+      }
+
+      <div class="timeline__dot"></div>
+
+      <div class="timeline__label">
+        <div class="timeline__stop-name">
+          {{ stop.stopName }}
+        </div>
+
+        <div class="timeline__time">
+          {{ stop.arrivalTime }} → {{ stop.departureTime }}
+        </div>
+
+        @if (getDelayForSequence(stop.sequence) !== null) {
+          <div class="timeline__delay">
+            +{{ getDelayForSequence(stop.sequence) }} min
+          </div>
+        }
+      </div>
+
+    </div>
+
+  }
+</div>
+    </div>
+
+  </mat-card-content>
+
+  } @else {
+  <mat-card-content>
+    <p class="timeline-empty">
+      Seleziona un trip dalla dashboard per vedere la timeline.
+    </p>
+  </mat-card-content>
+  }
+
+</mat-card>

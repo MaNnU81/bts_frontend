@@ -1,0 +1,68 @@
+
+<mat-tab-group
+  animationDuration="2000ms"
+  [selectedIndex]="selectedIndex"
+  (selectedIndexChange)="onIndexChange($event)">
+
+  @if (runs.length > 0) {
+    @for (run of runs; track run.scenarioId) {
+      <mat-tab>
+        <ng-template mat-tab-label>
+          <span class="run-tab__label">
+
+            <mat-icon class="run-tab__status-icon">
+              {{ getStatusIcon(run.status) }}
+            </mat-icon>
+
+            <span class="run-tab__title">
+              {{ run.lineLabel }}
+            </span>
+
+            <span class="run-tab__time">
+              {{ run.startTime }}
+            </span>
+
+            <span class="run-tab__badge run-tab__badge--{{ run.status }}">
+              {{ getStatusLabel(run.status) }}
+            </span>
+
+            <!-- X solo se rimovibile -->
+             @if (canRemove(run)) {
+            <button
+              type="button"
+              class="run-tab__close"
+              mat-icon-button
+              [disabled]="!canRemove(run)"
+              [matTooltip]="removeTooltip(run)"
+              (click)="onRemoveClick(run, $event)">
+              <mat-icon>close</mat-icon>
+            </button>
+            } 
+            
+          </span>
+        </ng-template>
+
+        <div class="run-tab__content">
+          <!-- Qui puoi mettere dettagli run se vuoi -->
+        </div>
+      </mat-tab>
+    }
+  } @else {
+    <mat-tab label="Nessuna Run">
+      <mat-card-content>
+        <p class="run-tab__empty">Nessuna simulazione in corso.</p>
+      </mat-card-content>
+    </mat-tab>
+  }
+</mat-tab-group>
+
+
+
+
+
+
+
+  <!--   
+  <mat-tab label="linea">Content 1</mat-tab>
+  <mat-tab label="Second">Content 2</mat-tab>
+  <mat-tab label="Third">Content 3</mat-tab> -->

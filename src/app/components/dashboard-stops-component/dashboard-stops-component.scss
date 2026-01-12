@@ -1,0 +1,22 @@
+.dashboard {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.dashboard__title {
+  margin: 8px;
+  font-size: 1rem;
+  font-weight: 600;
+}
+
+.dashboard__field {
+  width: 90%;
+  padding: 8px;
+}
+
+.dashboard__actions {
+  display: flex;
+  gap: 8px;
+  margin: 8px;
+}

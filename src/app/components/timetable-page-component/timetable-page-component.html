@@ -1,0 +1,120 @@
+<div class="timetable-page">
+
+  <!-- TOOLBAR -->
+  <mat-toolbar color="primary" class="header">
+
+    <!-- Bottone TRIP -->
+    <button mat-icon-button (click)="toggleTripsPanel()">
+      <mat-icon class="dashboard-panel__icon"> departure_board </mat-icon>
+    </button>
+    <span>Trip</span>
+
+    <!-- Bottone STOP -->
+    <button mat-icon-button (click)="toggleStopsPanel()">
+      <mat-icon class="dashboard-panel__icon">place</mat-icon>
+    </button>
+    <span>Stop</span>
+ 
+  <app-clock-component class="header__clock"
+    [displayTime]="displayTime">
+  </app-clock-component>
+  <div class="title"><h1 class="h1 blinking">BTS FrontEnd</h1></div>
+
+  <span class="toolbar-spacer"></span>
+    <a
+    mat-icon-button
+    routerLink="/map-add"
+    target="_blank"
+    rel="noopener"
+    aria-label="Nuovo scenario">
+      <mat-icon>add</mat-icon>
+    </a>
+  
+  </mat-toolbar>
+
+
+  <!-- PANNELLO TRIP -->
+  @if (showTripsPanel) {
+  <div class="dashboard-panel dashboard-panel--trips">
+    <button class="dashboard-panel__close" mat-icon-button (click)="toggleTripsPanel()">
+      <mat-icon>close</mat-icon>
+    </button>
+
+    <app-dashboard-trips-component [linesWithTrips]="linesWithTrips" (addToScenario)="onAddToScenario($event)"
+      (startTrip)="onTripSelected($event)" (stopRequested)="onStopRequested()">
+    </app-dashboard-trips-component>
+  </div>
+  }
+
+
+  <!-- PANNELLO STOP -->
+  @if (showStopsPanel) {
+  <div class="dashboard-panel dashboard-panel--stops">
+    <button class="dashboard-panel__close" mat-icon-button (click)="toggleStopsPanel()">
+      <mat-icon>close</mat-icon>
+    </button>
+
+    <app-dashboard-stops-component [linesWithStops]="linesWithStops" (stopSelected)="onStopSelected($event)"
+      (selectionCleared)="onStopSelectionCleared()">
+    </app-dashboard-stops-component>
+  </div>
+  }
+
+
+  <!-- GRIGLIA PRINCIPALE -->
+  <div class="timetable-grid">
+
+    <div class="panel panel--stop-board">
+
+      <app-stop-board-component [selectedStopId]="selectedStopId" [board]="stopBoard" [loading]="loadingStopBoard"
+        [error]="stopBoardError" [lastRefreshTime]="lastStopBoardRefresh"
+        (refreshClick)="onRefreshStopBoard()"></app-stop-board-component>
+    </div>
+
+
+    <div class="panel panel--bus-board">
+<app-run-tabs-component
+  [runs]="scenarioRuns"
+  [selectedScenarioId]="selectedScenarioId"
+  [isScenarioLive]="isScenarioLive"
+  (selectScenario)="onScenarioSelected($event)"
+  (removeScenario)="onScenarioRemoved($event)">
+
+      </app-run-tabs-component> <!-- test per le tab con material -->
+
+      <app-bus-board-component [tripPosition]="currentTripPosition" [stopLinesByStopId]="stopLinesByStopId"
+        [currentLineNumber]="currentLineNumber">
+      </app-bus-board-component>
+      <div class="goLive-button__bus-board"> 
+         <button
+        matButton="elevated"
+        
+        color="warn" 
+        (click)="resetScenario()">
+        Reset
+        </button> 
+        <button
+        matButton="elevated"
+        class="goLive-button__stop"
+        color="warn"
+        (click)="onStopRequested()">
+        Ferma simulazione
+        </button> 
+
+        <button  (click)="onGoLiveClick($event)" matButton="elevated">Go Live!
+        </button>
+        <button   matButton="elevated" (click)="openDialog()">Map!
+        </button>  
+    </div>
+    </div>
+
+    <div class="panel panel--route-timeline">
+      <app-route-timeline-component [delaysBySequence]="activeDelayMap"  [tripPosition]="currentTripPosition" [selectedStopId]="currentStopId"
+        (stopClicked)="onTimelineStopClicked($event)" [stopLinesByStopId]="stopLinesByStopId"
+        [currentLineNumber]="currentLineNumber">
+      </app-route-timeline-component>
+    </div>
+
+  </div>
+  
+</div>

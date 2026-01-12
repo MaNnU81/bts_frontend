@@ -1,0 +1,44 @@
+<!-- <div class="panel">
+  <h2 class="title">Stop editor</h2>
+
+  @if (state) {
+    <div class="badge">
+      Modalità: <strong>{{ state.mode === 'create' ? 'NUOVO' : 'MODIFICA' }}</strong>
+    </div>
+
+    <div class="field">
+      <label>ID</label>
+      <div class="readonly">{{ state.stopId ?? '— (DB assegna)' }}</div>
+    </div>
+
+    <div class="field">
+      <label>Nome fermata</label>
+      <input [(ngModel)]="state.name" placeholder="Es. Brignole" />
+    </div>
+
+    <div class="field grid2">
+      <div>
+        <label>Lat</label>
+        <div class="readonly">{{ state.lat ?? '—' }}</div>
+      </div>
+      <div>
+        <label>Lng</label>
+        <div class="readonly">{{ state.lng ?? '—' }}</div>
+      </div>
+    </div>
+
+    <div class="actions">
+      <button
+        class="btn"
+        (click)="onSave()"
+        [disabled]="!state.name.trim()">
+        Salva (UI)
+      </button>
+      <button class="btn ghost" (click)="onCancel()">Annulla</button>
+    </div>
+  } @else {
+    <div class="empty">
+      Seleziona una fermata sulla mappa oppure crea un nuovo marker.
+    </div>
+  }
+</div> -->

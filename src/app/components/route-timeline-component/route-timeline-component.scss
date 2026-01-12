@@ -1,0 +1,177 @@
+.timeline-card {
+  width: 100%;
+  box-sizing: border-box;
+    padding-left: 32px;
+  padding-right: 32px;
+}
+
+/* Contenitore timeline orizzontale */
+.timeline {
+  position: relative;
+  width: 100%;
+  height: 160px;        /* più alto = più spazio per label */
+  margin-top: 8px;
+}
+
+/* Linea orizzontale */
+.timeline__track {
+  position: absolute;
+  top: 60px;            /* posizione verticale della linea */
+  left: 0;
+  right: 0;
+  height: 4px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 999px;
+  overflow: hidden;
+  z-index: 1; 
+}
+
+/* Parte già percorsa */
+.timeline__track-fill {
+  height: 100%;
+  background: var(--mat-sys-primary, #1976d2);
+  border-radius: 999px;
+  z-index: 1; 
+  transition: width 0.6s ease-out;
+}
+
+
+/* Bus sulla linea */
+.timeline__bus {
+  position: absolute;
+  top: 60px;           /* stesso valore della track */
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10; 
+  width: 32px;          /* diametro del cerchio */
+  height: 32px;
+  border-radius: 50%;
+  background: rgb(228, 5, 5);    /* o primary color */
+  transition: left 0.8s ease-out;
+}
+
+.timeline__bus mat-icon {
+  font-size: 24px;
+
+}
+
+/* Contenitore dei marker delle fermate */
+.timeline__markers {
+  position: absolute;
+  top: 52px;           /* leggermente sotto la linea */
+  left: 0;
+  right: 0;
+  z-index: 5; 
+  cursor: pointer;
+}
+
+/* Singolo marker */
+.timeline__marker {
+  position: absolute;
+  top: 0;
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+/* Puntino sulla linea */
+.timeline__dot {
+  width: 20px;
+  height: 20px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--mat-sys-outline, #9e9e9e);
+}
+
+/* Label fermata */
+.timeline__label {
+  font-size: 0.75rem;
+  line-height: 1.2;
+}
+
+.timeline__stop-name {
+  font-weight: 500;
+  margin-bottom: 2px;
+}
+
+.timeline__time {
+  font-size: 0.7rem;
+  opacity: 0.8;
+}
+
+/* Stati visuali */
+.timeline__marker--past .timeline__dot {
+  background: var(--mat-sys-primary, #1976d2);
+  opacity: 0.6;
+}
+
+.timeline__marker--current .timeline__dot {
+  background: var(--mat-sys-primary, #1976d2);
+  box-shadow: 0 0 0 16px rgba(25, 118, 210, 0.3);
+}
+
+.timeline__marker--next .timeline__dot {
+  background: var(--mat-sys-secondary, #03a9f4);
+}
+
+.timeline__marker--past {
+  opacity: 0.6;
+}
+
+.timeline__marker--current .timeline__stop-name {
+  font-weight: 700;
+}
+
+.timeline__marker--next .timeline__stop-name {
+  text-decoration: underline;
+}
+
+.timeline-empty {
+  margin: 0;
+  font-style: italic;
+  opacity: 0.8;
+}
+
+.timeline__marker--selected .timeline__dot {
+  outline: 3px solid #e90101;
+  
+  outline-offset: 2px;
+  border-radius: 999px;
+}
+
+.timeline__marker:hover .timeline__dot {
+  transform: scale(1.15);
+}
+
+
+.timeline__delay {
+  margin-top: 2px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #c62828;
+}
+
+.timeline__lines {
+  position: absolute;
+  top: -40px;           /* sposta i badge sopra la linea/dot */
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  gap: 4px;
+}
+
+/* Singolo badge numero linea */
+.timeline__badge {
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 10px;
+  font-weight: 600;
+  text-align: center;
+  background: #f0c507e5;
+  color: #fff;
+}

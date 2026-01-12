@@ -1,0 +1,26 @@
+<!-- <p>leaflet-map works!</p> -->
+
+
+<div class="toolbar">
+  <button matButton="elevated" (click)="exportStopsGeoJson()">Export Stops GeoJSON</button>
+  <button matButton="elevated" (click)="exportLinesGeoJson()">Export Lines GeoJSON</button>
+</div>
+
+<div class="map-toggles">
+      <mat-slide-toggle 
+        [checked]="showFetchedStops"
+        (change)="showFetchedStops = $event.checked; applyFetchedVisibility()">
+        Stops
+      </mat-slide-toggle>
+
+      <mat-slide-toggle
+        [checked]="showFetchedLines"
+        (change)="showFetchedLines = $event.checked; applyFetchedVisibility()">
+        Lines
+      </mat-slide-toggle>
+</div>
+
+<div class="map-wrapper">
+  <div id="map" class="map-container"></div>
+</div>
+

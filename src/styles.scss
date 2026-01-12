@@ -1,0 +1,81 @@
+
+@use '@angular/material' as mat;
+@include mat.core();
+
+
+// Include theming for Angular Material with `mat.theme()`.
+// Questo mixin definisce le CSS variables per il tema Material 3.
+
+// Tema principale (puoi cambiare palette se vuoi)
+html {
+  @include mat.theme((
+    color: (
+      primary: mat.$cyan-palette,
+      tertiary: mat.$orange-palette,
+    ),
+    typography: Roboto,
+    density: 0,
+  ));
+}
+
+body {
+  // Default: tema chiaro
+  color-scheme: light;
+
+  // Background e testo basati sulle CSS variables di Angular Material
+  background-color: var(--mat-sys-surface);
+  color: var(--mat-sys-on-surface);
+  font: var(--mat-sys-body-medium);
+
+  // Reset margine di default del browser
+  margin: 0;
+}
+
+
+:root {
+  @include mat.tabs-overrides((
+    active-focus-indicator-color: #0205b4,
+    active-focus-label-text-color: rgb(21, 0, 255),
+    container-height: 40px,
+    inactive-label-text-color: rgba(3, 19, 245, 0.372),
+    inactive-ripple-color: #0205b4,
+  ));
+
+    @include mat.button-toggle-overrides((
+    text-color: orange,
+    
+  ));
+
+  @include mat.icon-overrides((
+    color: orange,
+  ));
+
+   @include mat.dialog-overrides((
+    container-color: rgba(39, 38, 37, 0.804),
+    subhead-color: red,
+    container-min-width: 900px,
+    
+  ));
+
+    @include mat.form-field-overrides((
+    disabled-leading-icon-color: red,
+    outlined-input-text-color: rgb(253, 253, 253),
+  ));
+
+  --font-title: 'Workbench', sans-serif;
+
+}
+
+
+
+
+
+.leaflet-container img,
+.leaflet-container .leaflet-tile {
+  max-width: none !important;
+  padding: 20px !important;;
+}
+
+
+
+

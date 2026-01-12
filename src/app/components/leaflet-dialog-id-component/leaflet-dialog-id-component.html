@@ -1,0 +1,43 @@
+<div mat-dialog-content>
+  <mat-form-field appearance="outline" style="width:100%">
+    <mat-label>
+      {{ data.kind === 'stop' ? 'stop_id (tabella stop.id)' : 'transport_line_id (tabella transport_line.id)' }}
+    </mat-label>
+    <input matInput type="number" [formControl]="idCtrl" />
+    @if (idCtrl.invalid) {
+      <mat-error>Inserisci un numero valido (>= 1)</mat-error>
+    }
+  </mat-form-field>
+
+  @if (data.kind === 'line') {
+    <mat-form-field appearance="outline" style="width:100%">
+      <mat-label>Colore linea</mat-label>
+      <mat-select [formControl]="colorCtrl">
+        @for (c of lineColors; track c.value) {
+          <mat-option [value]="c.value">
+            <span style="display:inline-flex; align-items:center; gap:8px;">
+              <span
+                style="width:14px; height:14px; border-radius:999px; display:inline-block; border:1px solid rgba(0,0,0,.2);"
+                [style.background]="c.value">
+              </span>
+              {{ c.label }}
+            </span>
+          </mat-option>
+        }
+      </mat-select>
+      @if (colorCtrl.invalid) {
+        <mat-error>Seleziona un colore</mat-error>
+      }
+    </mat-form-field>
+  }
+</div>
+
+<div mat-dialog-actions align="end">
+  <button matButton="elevated" (click)="cancel()">Annulla</button>
+  <button
+    matButton="elevated"
+    (click)="save()"
+    [disabled]="idCtrl.invalid || (data.kind === 'line' && colorCtrl.invalid)">
+    Salva
+  </button>
+</div>

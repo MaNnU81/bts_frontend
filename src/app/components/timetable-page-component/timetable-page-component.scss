@@ -1,0 +1,222 @@
+/* ───────────────── Toolbar ───────────────── */
+
+mat-toolbar {
+  position: relative;
+}
+
+
+.title  {
+  width: 150px;
+  height: 50px;
+ background-color: #0b1630;
+  // border: 2px solid #0205b4;
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 0px 8px;
+
+  font-size: 1.5rem;
+  font-weight: 600;
+  border-radius: 6px;
+  align-items: center;  
+  justify-content: center;
+  display: flex;
+  color: orange;
+}
+
+@keyframes blink {
+  0%   { opacity: 1; }
+  49%  { opacity: 1; }
+  50%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.h1.blinking {
+  animation: blink 2s steps(1, end) infinite;
+}
+
+
+
+
+mat-toolbar h1 {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  margin: 0;
+  font-size: 2rem;
+  font-weight: 600;
+  font-family: var(--font-title);
+}
+
+.header__clock {
+  position: absolute;
+  left: 38%;
+  transform: translateX(-50%);
+  top: 50%;
+  transform: translate(-50%, -50%);
+  margin-top: 8px;
+  
+  display: block;
+}
+
+.toolbar-spacer {
+  flex: 1 1 auto;
+}
+
+/* ───────────────── Griglia principale ───────────────── */
+
+.timetable-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr auto;
+  grid-template-areas:
+    "busboard stopboard"
+    "routetimeline routetimeline";
+  gap: 16px;
+  padding: 16px;
+  background: #0f172a;
+  /* blu notte */
+  min-height: calc(100vh - 64px);
+  /* viewport meno toolbar */
+  box-sizing: border-box;
+}
+
+/* Card generiche dei pannelli principali */
+.panel {
+  background: #f9fafb;
+  border-radius: 12px;
+  border: 2px solid orange;
+  box-shadow: 0 8px 16px rgba(15, 23, 42, 0.18);
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: auto;
+}
+
+
+.header {
+  background-color: #0b1630;
+  color: orange;
+}
+
+.panel--stop-board {
+  grid-area: stopboard;
+  min-height: 0;
+   background-color: #0b1630;
+   border: 2px solid orange;
+     display: flex;
+  flex-direction: column;
+}
+
+.panel--bus-board {
+  grid-area: busboard;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.panel--route-timeline {
+  grid-area: routetimeline;
+  min-height: 0;
+  height: 35vh;
+}
+
+/* ───────────────── Pannelli “menu” Trip / Stop ───────────────── */
+
+/* Contenitore generico pannello laterale */
+.dashboard-panel {
+  position: fixed;
+  top: 64px;
+  /* sotto la toolbar */
+  bottom: 16px;
+  width: 300px;
+  height: 50%;
+  padding: 16px;
+  box-sizing: border-box;
+  overflow: auto;
+
+  /* look tipo overlay/menu */
+  // background-color: #0f172ada;
+  background-color: rgb(255, 255, 255);
+  border-radius: 0 0 12px 0;
+  border: 1px solid rgba(148, 163, 184, 0.4);
+  /* grigio-blu chiaro */
+  border-top: 0;
+  box-shadow: 0 18px 32px 0 rgba(15, 23, 42, 0.65);
+
+  z-index: 1000;
+}
+
+button {
+  border: none !important;
+  background-color: transparent;
+}
+
+/* lato sinistro: Trip */
+.dashboard-panel--trips {
+  left: 0px;
+}
+
+/* lato destro: Stop */
+.dashboard-panel--stops {
+  left: 0px;
+}
+
+/* pulsante chiudi in alto a destra nel pannello */
+.dashboard-panel__close {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+}
+
+/* opzionale: un po' di spazio per non far stare la X sopra al contenuto */
+.dashboard-panel app-dashboard-trips-component {
+  display: block;
+  margin-top: 32px;
+}
+
+.goLive-button__bus-board {
+margin-top: auto;
+display: flex;
+align-items: center;
+justify-content: flex-end;
+padding: 10px;
+gap: 8px;
+}
+
+.goLive-button__stop {
+  margin-right: auto; 
+}
+
+
+
+
+.leaflet-container img,
+.leaflet-container .leaflet-tile {
+  max-width: none !important;
+}
+/* ───────────────── Responsività ───────────────── */
+
+@media (max-width: 900px) {
+  .timetable-grid {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "stopboard"
+      "busboard"
+      "routetimeline";
+  }
+
+  .panel--bus-board {
+    justify-self: stretch;
+    max-width: none;
+  }
+
+  /* pannelli laterali più stretti / centrati su mobile */
+  .dashboard-panel {
+    left: 8px;
+    right: 8px;
+    width: auto;
+  }
+
+  
+}

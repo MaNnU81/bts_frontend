@@ -1,0 +1,68 @@
+<h1>Trip Simulator (Angular 20)</h1>
+
+<section>
+  <label>
+    Trip ID:
+    <input
+      type="number"
+      [value]="tripId()"
+      (input)="tripId.set($any($event.target).value)"
+    />
+  </label>
+
+  <label>
+    Orario (HH:mm):
+    <input
+      type="text"
+      [value]="currentTime()"
+      (input)="currentTime.set($any($event.target).value)"
+    />
+  </label>
+
+  <button (click)="loadPosition()">Aggiorna posizione</button>
+</section>
+
+<hr />
+
+@if (loading()) {
+  <p>Caricamento...</p>
+}
+
+@if (error()) {
+  <p style="color:red">{{ error() }}</p>
+}
+
+@if (data(); as d) {
+
+  <h2>{{ d.lineName }} – {{ d.currentTime }}</h2>
+
+  <p>
+    Stato:
+    @if (!d.isStarted) { Non iniziato }
+    @if (d.isStarted && !d.isFinished) { In corso }
+    @if (d.isFinished) { Terminato }
+  </p>
+
+  @if (d.currentStopName) {
+    <p>Fermata corrente: <strong>{{ d.currentStopName }}</strong></p>
+  }
+
+  @if (d.nextStopName) {
+    <p>Prossima fermata: <strong>{{ d.nextStopName }}</strong></p>
+  }
+
+  <p>
+    Progress: {{ (d.progressBetweenStops * 100) | number : '1.0-0' }}%
+  </p>
+
+  <h3>Fermate del trip</h3>
+
+  <ul>
+    @for (s of d.stops; track s.sequence) {
+      <li>
+        #{{ s.sequence }} – {{ s.stopName }}
+        ({{ s.arrivalTime }} → {{ s.departureTime }})
+      </li>
+    }
+  </ul>
+}

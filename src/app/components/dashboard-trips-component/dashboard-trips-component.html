@@ -1,0 +1,95 @@
+
+<section class="dashboard">
+    <h2 class="dashboard__title">Seleziona il viaggio</h2>
+
+    <mat-form-field appearance="outline" class="dashboard__field">
+        <mat-label>Linea</mat-label>
+
+    <mat-select
+      [value]="selectedLineId"
+      (valueChange)="onLineChange($event)">
+        @for (line of linesWithTrips; track line.lineId) {
+           <mat-option [value]="line.lineId">
+            {{ line.lineLabel }}
+           </mat-option> 
+        }
+        </mat-select>
+
+    </mat-form-field>
+
+<mat-form-field appearance="outline" class="dashboard__field">
+    <mat-label>Trip (orario di partenza)</mat-label>
+
+    <mat-select
+      [disabled]="tripsForSelectedLine.length === 0"
+      [value]="selectedTripId"
+      (valueChange)="onTripChange($event)">
+
+    @for (trip of tripsForSelectedLine; track trip.id) {
+        <mat-option [value]="trip.id">
+            {{ trip.startTime }}
+        </mat-option>
+    }
+    </mat-select>
+
+
+</mat-form-field>
+
+
+<div class="dashboard__mode">
+    <span class="dashboard__mode-label">Modalità simulazione</span>
+
+<div class="dashboard__mode-options">
+    <mat-checkbox
+    [checked]="liveEnabled"
+    (change)="onLiveCheckboxChange($event.checked)">
+    Live
+  </mat-checkbox>
+  
+  <mat-checkbox
+    [checked]="scheduleEnabled"
+    (change)="onScheduleCheckboxChange($event.checked)">
+    Schedule
+  </mat-checkbox>
+
+
+</div>
+
+@if (liveEnabled) {
+  <div class="dashboard__delay">
+    <span class="dashboard__delay-label">
+      Ritardo massimo: {{ maxDelayMinutes }} min
+    </span>
+
+    <mat-slider
+      min="0"
+      max="30"
+      step="1"
+      discrete>
+      <input
+        matSliderThumb
+        [(ngModel)]="maxDelayMinutes" />
+    </mat-slider>
+  </div>
+}
+    
+  </div>
+
+  <div class="dashboard__actions">
+    <button
+      matButton="elevated"
+      color="primary"
+      [disabled]="selectedTripId == null"
+      (click)="onStartClick()">
+      Aggiungi scenario
+    </button>
+
+    <button
+      matButton="elevated"
+      color="warn"
+      (click)="onStopClick()">
+      Ferma simulazione
+    </button>
+  </div>
+ 
+</section>

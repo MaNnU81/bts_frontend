@@ -1,0 +1,90 @@
+<mat-card class="bus-board-card">
+  
+  @if (tripPosition; as trip) {
+    <div class="bus-board">
+      <!-- Timeline verticale -->
+      <div class="bus-board__timeline">
+        @for (stop of visibleStops; track stop.sequence) {
+          <div
+            class="bus-board__stop"
+            [class.past]="isPast(stop.sequence)"
+            [class.current]="isCurrent(stop.sequence)"
+            [class.next]="isNext(stop.sequence)">
+
+            <div class="dot"></div>
+
+            <div class="info">
+              <div class="name">{{ stop.stopName }}</div>
+              <div class="time">{{ stop.arrivalTime }} → {{ stop.departureTime }}</div>
+
+               @let delay = getDelayForSequence(stop.sequence);
+              @if (delay !== null) {
+                <div class="bus-board__delay-stop">
+                  +{{ delay }} min
+                </div>
+              }
+            </div>
+
+            @if (isCurrent(stop.sequence)) {
+              <div class="bus-board__arrow">
+                <mat-icon>arrow_downward</mat-icon>
+              </div>
+            }
+          </div>
+        }
+      </div>
+
+      <!-- Colonna destra -->
+      <div class="bus-board__info">
+        <h3>{{ trip.lineName }}</h3>
+        <p>Orario simulazione: {{ trip.currentTime }}</p>
+
+        @if (trip.isAtStop && trip.currentStopName) {
+          <p>
+            Siamo alla fermata <strong>{{ trip.currentStopName }}</strong>
+          </p>
+        } @else if (trip.nextStopName) {
+          <p>
+            Stiamo arrivando alla fermata <strong>{{ trip.nextStopName }}</strong>
+          </p>
+        } @else {
+          <p>Il viaggio è terminato.</p>
+        }
+
+        <!-- 👇 NUOVO: ultimo ritardo registrato, resta visibile anche dopo -->
+        @if (lastDelayMinutes != null) {
+          <p class="bus-board__delay">
+            Ritardo registrato:
+            <strong>+{{ lastDelayMinutes }} min</strong>
+            @if (lastDelayStopName) {
+              <span> (alla fermata {{ lastDelayStopName }})</span>
+            }
+          </p>
+        }
+
+@let coincidenceLines = getCoincidenceLinesForNextStop();
+
+@if (coincidenceLines.length > 0 && trip.nextStopName) {
+  <div class="bus-board__coincidences">
+    <h4 class="bus-board__coincidences-title">
+      Coincidenze alla prossima fermata
+    </h4>
+    <div class="bus-board__coincidences-badges">
+      @for (num of coincidenceLines; track num) {
+        <span class="bus-board__badge">
+          {{ num }}
+        </span>
+      }
+    </div>
+  </div>
+}
+
+        
+      </div>
+    </div>
+  } @else {
+    <mat-card-content>
+    <p class="bus-board-empty">Seleziona un trip dalla dashboard per vedere lo schermo bus.</p>
+    </mat-card-content>
+  }
+</mat-card>

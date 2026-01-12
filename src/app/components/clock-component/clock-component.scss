@@ -1,0 +1,64 @@
+.clock-container {
+  width: 150px;
+  height: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  border: 2px solid orange;
+  padding: 6px 8px;
+  box-sizing: border-box;
+  background: #0b1630;
+  border-radius: 6px;
+}
+
+/* RIGA NUMERI */
+.clock-time {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-top: 16px;
+
+  line-height: 1;
+}
+
+.clock-number {
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.clock-separator {
+  margin: 0 6px;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.6);
+
+  /* allineamento PERFETTO con i numeri */
+  transform: translateY(-1px);
+}
+
+@keyframes blink {
+  0%   { opacity: 1; }
+  49%  { opacity: 1; }
+  50%  { opacity: 0; }
+  100% { opacity: 0; }
+}
+
+.clock-separator.blinking {
+  animation: blink 1s steps(1, end) infinite;
+}
+
+/* RIGA LABEL */
+.clock-labels {
+  display: flex;
+  justify-content: space-between;
+
+ margin-bottom: 4px;
+  padding: 0 8px;
+}
+
+.clock-label {
+  font-size: 0.55rem;
+  color: rgba(255, 255, 255, 0.45);
+  text-transform: uppercase;
+}

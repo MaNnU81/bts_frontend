@@ -1,0 +1,126 @@
+.bus-board {
+  display: grid;
+  grid-template-columns: 1fr 2fr;
+  gap: 24px;
+}
+
+.bus-board__timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 24px;
+  border-right: 2px solid #ccc;
+  padding-right: 16px;
+}
+
+.bus-board__stop {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.bus-board__stop .dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #9e9e9e;
+    margin-left: 8px;
+}
+.bus-board__stop.current {
+  background: linear-gradient(90deg, rgba(255,255,0,0.3), rgba(0,255,0,0.3));
+  border-radius: 8px;
+  padding: 8px 4px;
+  border-right: 4px solid #2e7d32;
+}
+
+
+.bus-board__stop.past  {
+  opacity: 0.6;
+  color: #9e9e9e;
+}
+.bus-board__stop.past .dot {
+  background: #1976d24f;
+  opacity: 0.6;
+  color: #9e9e9e !important;
+}
+
+.bus-board__stop.current .dot {
+  background: rgba(173, 255, 47, 0.9); 
+  box-shadow: 0 0 0 6px rgba(25,118,210,0.3);
+
+}
+
+.bus-board__stop.next .dot {
+  background: #03a9f4;
+}
+
+.bus-board__info {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  font-size: 1rem;
+}
+
+.bus-board__info .adv {
+  margin-top: 16px;
+  padding: 12px;
+  background: #eee;
+  border-radius: 8px;
+  text-align: center;
+  
+}
+
+.bus-board__delay {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #c62828;
+}
+
+.bus-board__delay-stop {
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: #c62828;
+  margin-top: 2px;
+}
+
+.bus-board__delay {
+  margin-top: 4px;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: #c62828;
+}
+
+.bus-board__coincidences {
+  margin-top: 8px;
+}
+
+.bus-board__coincidences-title {
+  font-size: 0.9rem;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+
+.bus-board-empty {
+  margin: 0;
+  font-style: italic;
+  opacity: 0.8;
+
+}
+.bus-board__coincidences-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+.bus-board__badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: #388e3c;   /* o un verde "coincidenze" */
+  color: #fff;
+}

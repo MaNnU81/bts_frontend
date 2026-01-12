@@ -1,0 +1,118 @@
+<section class="stop-board">
+
+  @if (!selectedStopId) {
+  <!-- Nessuna fermata selezionata -->
+  <p class="stop-board__placeholder">
+    Nessuna fermata selezionata
+  </p>
+  } @else {
+
+  <mat-card class="stopboard">
+
+    <!-- HEADER -->
+    <header class="stopboard__header">
+      <div class="stopboard__header-main">
+        <div class="stopboard__stop-name">
+          {{ board?.stopName || ('Fermata ID ' + selectedStopId) }}
+        </div>
+
+        <div class="stopboard__clock">
+          <mat-icon class="stopboard__clock-icon">schedule</mat-icon>
+          <span class="clock__stopboard-header">{{ board?.currentTime || '--:--' }}</span>
+        </div>
+      </div>
+
+      <div class="stopboard__header-sub">
+        <span class="stopboard__col stopboard__col--line">Linea</span>
+        <span class="stopboard__col stopboard__col--route">Destinazione</span>
+        <span class="stopboard__col stopboard__col--time">Prev.</span>
+        <span class="stopboard__col stopboard__col--delay">Live</span>
+      </div>
+    </header>
+
+    <!-- CONTENUTO PRINCIPALE -->
+    @if (loading) {
+    <!-- LOADING -->
+    <div class="stopboard__loading">
+      <mat-progress-spinner mode="indeterminate" diameter="40"></mat-progress-spinner>
+    </div>
+    } @else {
+
+    @if (error) {
+    <!-- ERROR -->
+    <div class="stopboard__error">
+      {{ error }}
+    </div>
+    } @else {
+
+    @if (board && board.rows.length === 0) {
+    <!-- EMPTY STATE -->
+    <div class="stopboard__empty">
+      Nessuna corsa in arrivo per questa fermata.
+    </div>
+    } @else if (board && board.rows.length > 0) {
+    <!-- LISTA CORSE -->
+    <section class="stopboard__body">
+      @for (row of board.rows; track row.tripId) {
+      <div class="stopboard__row" [class.stopboard__row--live]="row.isLive">
+        <span class="stopboard__col stopboard__col--line">
+          {{ row.lineNumber }}
+        </span>
+
+        <span class="stopboard__col stopboard__col--route">
+          {{ row.direction }} 
+          <!-- · {{ row.route }} -->
+        </span>
+
+        <span class="stopboard__col stopboard__col--time">
+          {{ row.predictedDeparture }}
+        </span>
+
+<span
+  class="stopboard__col stopboard__col--delay"
+  [class.stopboard__col--delay-late]="row.isLive && row.liveDelayMinutes !== null && row.liveDelayMinutes > 0"
+  [class.stopboard__col--delay-on-time]="row.isLive && (row.liveDelayMinutes === null || row.liveDelayMinutes === 0)"
+>
+  @if (!row.isLive) {
+    <!-- Nessun live: trattiamo come solo orario tabellare -->
+    —
+  } @else if (row.liveDelayMinutes === null) {
+    <!-- Live attivo ma senza valore di ritardo: "in orario" -->
+    in orario
+  } @else if (row.liveDelayMinutes > 0) {
+    <!-- Ritardo positivo -->
+    +{{ row.liveDelayMinutes }}'
+  } @else {
+    <!-- liveDelayMinutes === 0 -->
+    in orario
+  }
+</span>
+      </div>
+      }
+    </section>
+    }
+    }
+    }
+
+    <!-- FOOTER -->
+    <footer class="stopboard__footer" [class.stopboard__footer--disabled]="loading">
+      <div class="stopboard__footer-top">
+        <span>Ultimo aggiornamento: {{ lastRefreshTime || '—' }}</span>
+<!-- 
+        <button mat-icon-button type="button" (click)="onRefreshClick()" aria-label="Aggiorna palina">
+          <mat-icon>refresh</mat-icon>
+        </button> -->
+      </div>
+
+      <div class="stopboard__ticker">
+        <span class="stopboard__ticker-label">Info servizio ·</span>
+        <span class="stopboard__ticker-text">
+          (placeholder) Qui in futuro testo scorrevole con news e messaggi di servizio.
+        </span>
+      </div>
+    </footer>
+
+  </mat-card>
+  }
+
+</section>
