@@ -1,5 +1,3 @@
-
-
 .dashboard {
   display: flex;
   flex-direction: column;
@@ -16,22 +14,6 @@
   gap: 12px;
   align-items: center;
   flex-wrap: wrap;
-}
-
-.badge {
-  padding: 6px 10px;
-  border-radius: 10px;
-  border: 1px solid rgba(0,0,0,0.12);
-}
-
-.dashboard__field {
-  width: 100%;
-}
-
-.dashboard__grid2 {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 10px;
 }
 
 .empty {

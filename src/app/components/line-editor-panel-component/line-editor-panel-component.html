@@ -1,0 +1,39 @@
+<section class="dashboard">
+  <!-- <h2 class="dashboard__title">Line editor</h2> -->
+
+  <mat-divider></mat-divider>
+
+  @if (mode === 'line-create') {
+    <div class="empty">
+      Modalità: <strong>CREAZIONE</strong><br />
+      Seleziona fermate (da mappa o ricerca) per costruire la sequenza.
+    </div>
+
+    <div class="dashboard__actions">
+      <button mat-raised-button color="primary" (click)="confirmSequence.emit()">
+        Conferma sequenza
+      </button>
+
+      <button mat-raised-button (click)="close.emit()">
+        Chiudi
+      </button>
+    </div>
+  } @else if (mode === 'line-edit') {
+    <div class="empty">
+      Modalità: <strong>EDIT SHAPE</strong><br />
+      Qui abiliteremo Leaflet.draw edit sulla polyline bozza.
+    </div>
+
+    <div class="dashboard__actions">
+      <button mat-raised-button (click)="backToCreate.emit()">
+        Torna a selezione fermate
+      </button>
+
+      <button mat-raised-button (click)="close.emit()">
+        Chiudi
+      </button>
+    </div>
+  } @else {
+    <div class="empty">Nessuna modalità linea attiva.</div>
+  }
+</section>

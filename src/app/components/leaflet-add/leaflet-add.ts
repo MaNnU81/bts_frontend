@@ -6,14 +6,19 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatSelectModule } from '@angular/material/select';
 import { MatInputModule } from '@angular/material/input';
-
+import { LeafletService } from '../../services/leaflet-service';
+import { StopEditorPanelComponent } from '../stop-editor-panel-component/stop-editor-panel-component';
 
 import * as L from 'leaflet';
 import 'leaflet-draw';
 
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { DataService } from '../../services/data-service';
-import { MatDivider } from "@angular/material/divider"; // <-- aggiorna path
+import { MatDivider } from '@angular/material/divider';
+import { MatIconModule } from '@angular/material/icon';
+import {
+  LineEditorPanelComponent,
+} from '../line-editor-panel-component/line-editor-panel-component';
 
 type StopEditorMode = 'create' | 'edit';
 
@@ -26,10 +31,26 @@ type StopEditorState = {
   layer: L.Marker | null;
 };
 
+type EditorPanel = 'stop' | 'line' | null;
+type EditorMode = 'idle' | 'stop-edit' | 'line-create' | 'line-edit';
+
+
+
 @Component({
   selector: 'app-leaflet-add',
   standalone: true,
-  imports: [MatInputModule, MatSelectModule, MatFormFieldModule, MatButtonModule, CommonModule, FormsModule, MatSlideToggleModule, MatDivider],
+  imports: [
+    MatInputModule,
+    MatSelectModule,
+    MatFormFieldModule,
+    MatButtonModule,
+    MatIconModule,
+    CommonModule,
+    FormsModule,
+    MatSlideToggleModule,
+    StopEditorPanelComponent,
+    LineEditorPanelComponent,
+  ],
   templateUrl: './leaflet-add.html',
   styleUrl: './leaflet-add.scss',
 })
@@ -42,6 +63,10 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
   >();
   private updatedDraft = new Map<number, { id: number; name: string; lat: number; lng: number }>();
   private deletedDraft = new Set<number>();
+
+  //per undo
+  private baselineStopsById = new Map<number, { name: string; lat: number; lng: number }>();
+  private deletedMarkersById = new Map<number, L.Marker>();
 
   private tmpCounter = 1;
 
@@ -61,7 +86,10 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
   private sub?: Subscription;
 
-  constructor(private dataService: DataService) {}
+openPanel: EditorPanel = null;   
+editorMode: EditorMode = 'idle';
+
+  constructor(private dataService: DataService, private leafMapService: LeafletService) {}
 
   get pendingCount(): number {
     return this.createdDraft.size + this.updatedDraft.size + this.deletedDraft.size; //.size è il .length per map e set
@@ -72,41 +100,27 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
   }
 
   ngAfterViewInit(): void {
-    this.initMap();
+    const { map, stopsGroup, linesGroup } = this.leafMapService.init({
+      elementId: 'leafletAddMap',
+      center: [44.4072, 8.9338],
+      zoom: 15,
+    });
+
+    this.map = map;
+    this.stopsGroup = stopsGroup;
+    this.linesGroup = linesGroup;
+
+    this.initDrawAndEvents();
     this.loadGeoAndRender();
   }
 
   ngOnDestroy(): void {
     this.sub?.unsubscribe();
-    this.map?.remove();
+    this.leafMapService.destroy();
   }
 
-  private initMap(): void {
-    // Icone Leaflet (come nel dialog)
-    delete (L.Icon.Default.prototype as any)._getIconUrl;
-    L.Icon.Default.mergeOptions({
-      iconRetinaUrl: '/leaflet/marker-icon-2x.png',
-      iconUrl: '/leaflet/marker-icon.png',
-      shadowUrl: '/leaflet/marker-shadow.png',
-    });
-
-    this.map = L.map('leafletAddMap', {
-      center: [44.4072, 8.9338],
-      zoom: 15,
-    });
-
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      maxZoom: 19,
-      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>',
-    }).addTo(this.map);
-
-    this.stopsGroup = new L.FeatureGroup();
-    this.linesGroup = new L.FeatureGroup();
-    this.map.addLayer(this.stopsGroup);
-    this.map.addLayer(this.linesGroup);
-
+  private initDrawAndEvents(): void {
     // Draw: SOLO MARKER
-
 
     const drawControl = new L.Control.Draw({
       edit: {
@@ -115,7 +129,7 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
       },
       draw: {
         marker: {},
-        polyline: {},
+        polyline: false,
         polygon: false,
         rectangle: false,
         circle: false,
@@ -190,6 +204,7 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
       const tempId = this.newTempId();
       (layer as any).feature.properties.temp_id = tempId;
+      this.leafMapService.setStopIconUpdated(layer as L.Marker);
 
       (layer as any).bindPopup?.(`(nuovo) temp_id: ${tempId}`);
 
@@ -214,8 +229,10 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
         // marker DB: segna delete
         if (props?.stop_id) {
           const id = Number(props.stop_id);
+          this.deletedMarkersById.set(id, layer as L.Marker);
           this.deletedDraft.add(id);
           this.updatedDraft.delete(id); // se era anche in update, vince delete
+          this.leafMapService.moveStopToDeleted(layer as L.Marker);
         }
       });
 
@@ -232,6 +249,25 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     setTimeout(() => this.map.invalidateSize(), 0);
   }
 
+  private buildStopsBaselineFromGeoJson(stopsGeoJson: any): void {
+    this.baselineStopsById.clear();
+
+    if (stopsGeoJson?.type !== 'FeatureCollection' || !Array.isArray(stopsGeoJson.features)) return;
+
+    for (const f of stopsGeoJson.features) {
+      const id = f?.properties?.stop_id;
+      const name = f?.properties?.name ?? '';
+      const coords = f?.geometry?.coordinates;
+
+      if (typeof id !== 'number' || !Array.isArray(coords) || coords.length < 2) continue;
+
+      const lng = Number(coords[0]);
+      const lat = Number(coords[1]);
+
+      this.baselineStopsById.set(id, { name, lat, lng });
+    }
+  }
+
   private loadGeoAndRender(): void {
     this.loading = true;
     this.error = null;
@@ -242,9 +278,15 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
       linesGeoJson: this.dataService.getLinesGeoJson(),
     }).subscribe({
       next: ({ stopsGeoJson, linesGeoJson }) => {
+        this.buildStopsBaselineFromGeoJson(stopsGeoJson);
         this.buildFetchedLayersFromData(stopsGeoJson, linesGeoJson);
-        this.applyFetchedVisibility();
-        this.fitToContent();
+        this.leafMapService.applyGeoVisibility(
+          this.stopsGeoLayer,
+          this.linesGeoLayer,
+          this.showFetchedStops,
+          this.showFetchedLines
+        );
+        this.leafMapService.fitToContent();
         this.loading = false;
       },
       error: (err) => {
@@ -255,6 +297,15 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     });
   }
 
+  onVisibilityChanged(): void {
+    this.leafMapService.applyGeoVisibility(
+      this.stopsGeoLayer,
+      this.linesGeoLayer,
+      this.showFetchedStops,
+      this.showFetchedLines
+    );
+  }
+
   private buildFetchedLayersFromData(stopsGeoJson: any, linesGeoJson: any): void {
     try {
       // STOPS
@@ -262,6 +313,7 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
         this.stopsGeoLayer = L.geoJSON(stopsGeoJson, {
           pointToLayer: (feature: any, latlng) => L.marker(latlng),
           onEachFeature: (feature: any, layer: any) => {
+            this.leafMapService.setStopIconNormal(layer as L.Marker);
             const id = feature?.properties?.stop_id;
             const name = feature?.properties?.name;
 
@@ -307,27 +359,8 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     }
   }
 
-  public applyFetchedVisibility(): void {
-    // STOPS
-    if (this.stopsGeoLayer) {
-      if (this.showFetchedStops) {
-        this.stopsGeoLayer.eachLayer((child: L.Layer) => this.stopsGroup.addLayer(child));
-      } else {
-        this.stopsGeoLayer.eachLayer((child: L.Layer) => this.stopsGroup.removeLayer(child));
-      }
-    }
-
-    // LINES
-    if (this.linesGeoLayer) {
-      if (this.showFetchedLines) {
-        this.linesGeoLayer.eachLayer((child: L.Layer) => this.linesGroup.addLayer(child));
-      } else {
-        this.linesGeoLayer.eachLayer((child: L.Layer) => this.linesGroup.removeLayer(child));
-      }
-    }
-  }
-
   private selectStopLayer(layer: L.Marker, forceCreateMode = false): void {
+    if (this.openPanel === 'line') return;
     const props = (layer as any)?.feature?.properties ?? {};
     const latlng = layer.getLatLng?.();
 
@@ -342,20 +375,6 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
       lng: latlng?.lng ?? null,
       layer,
     };
-  }
-
-  private fitToContent(): void {
-    const bounds = new L.LatLngBounds([]);
-
-    this.stopsGroup.eachLayer((l: any) => {
-      if (l.getLatLng) bounds.extend(l.getLatLng());
-    });
-
-    this.linesGroup.eachLayer((l: any) => {
-      if (l.getBounds) bounds.extend(l.getBounds());
-    });
-
-    if (bounds.isValid()) this.map.fitBounds(bounds.pad(0.1));
   }
 
   // Sidebar actions (per ora solo UI)
@@ -402,6 +421,8 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
       this.deletedDraft.delete(id);
       this.updatedDraft.set(id, { id, name, lat: latlng.lat, lng: latlng.lng });
       layer.bindPopup?.(`stop_id: ${id}<br/>${name}`);
+
+      this.leafMapService.setStopIconUpdated(layer);
     }
   }
 
@@ -421,7 +442,7 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
       next: (res) => {
         // 1) created: tempId -> id
         for (const c of res.created) {
-          const marker = this.findMarkerByTempId(c.tempId);
+          const marker = this.leafMapService.findStopMarkerByTempId(c.tempId);
           if (!marker) continue;
 
           const props = (marker as any).feature?.properties ?? {};
@@ -433,12 +454,11 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
           (marker as any).feature.properties = props;
 
           marker.bindPopup?.(`stop_id: ${c.id}<br/>${c.name}`);
+          this.leafMapService.setStopIconNormal(marker);
         }
 
-        // 2) deleted: già rimossi dalla mappa (draw delete li toglie), qui pulizia set
-        // 3) updated: aggiorna popup/name in caso DB normalizzi
         for (const u of res.updated) {
-          const marker = this.findMarkerByStopId(u.id);
+          const marker = this.leafMapService.findStopMarkerByStopId(u.id);
           if (!marker) continue;
 
           const props = (marker as any).feature?.properties ?? {};
@@ -446,12 +466,31 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
           (marker as any).feature.properties = props;
           marker.bindPopup?.(`stop_id: ${u.id}<br/>${props.name}`);
+          this.leafMapService.setStopIconNormal(marker);
         }
 
+        for (const id of res.deleted) {
+          const m = this.deletedMarkersById.get(id);
+          if (m) {
+            this.leafMapService.getDeletedGhostGroup().removeLayer(m);
+            this.deletedMarkersById.delete(id);
+          }
+        }
         // pulizia draft
         this.createdDraft.clear();
         this.updatedDraft.clear();
         this.deletedDraft.clear();
+        this.deletedMarkersById.clear();
+        this.editorState = null;
+
+        // ✅ reset view (evita duplicati) + reload baseline/layers
+        this.stopsGroup.clearLayers();
+        this.linesGroup.clearLayers();
+        this.leafMapService.getDeletedGhostGroup().clearLayers();
+        this.stopsGeoLayer = undefined;
+        this.linesGeoLayer = undefined;
+
+        this.loadGeoAndRender();
 
         alert('Salvataggio completato (batch).');
       },
@@ -462,41 +501,147 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     });
   }
 
-  private findMarkerByTempId(tempId: string): L.Marker | null {
-    let found: L.Marker | null = null;
-    this.stopsGroup.eachLayer((l: any) => {
-      const props = l?.feature?.properties;
-      if (props?.temp_id === tempId) found = l as L.Marker;
-    });
-    return found;
-  }
-
-  private findMarkerByStopId(stopId: number): L.Marker | null {
-    let found: L.Marker | null = null;
-    this.stopsGroup.eachLayer((l: any) => {
-      const props = l?.feature?.properties;
-      if (Number(props?.stop_id) === stopId) found = l as L.Marker;
-    });
-    return found;
-  }
-
   markDeleteCurrent(): void {
-  const st = this.editorState;
-  if (!st || !st.layer || st.stopId == null) return;
+    const st = this.editorState;
+    if (!st || !st.layer || st.stopId == null) return;
 
-  const id = st.stopId;
+    const id = st.stopId;
 
-  // marca delete
-  this.deletedDraft.add(id);
+    // marca delete
+    this.deletedDraft.add(id);
 
-  // se era in update, vince delete
-  this.updatedDraft.delete(id);
+    // se era in update, vince delete
+    this.updatedDraft.delete(id);
 
-  // rimuovi dalla mappa
-  this.stopsGroup.removeLayer(st.layer);
+    this.deletedMarkersById.set(id, st.layer);
+    this.leafMapService.moveStopToDeleted(st.layer);
+    // // rimuovi dalla mappa
+    // this.stopsGroup.removeLayer(st.layer);
 
-  // reset editor
-  this.editorState = null;
+    // reset editor
+    this.editorState = null;
+  }
+
+  restoreCurrentStop(): void {
+    const st = this.editorState;
+    if (!st || !st.layer) return;
+
+    const layerAny: any = st.layer;
+    const props = layerAny?.feature?.properties ?? {};
+
+    // 1) se è un marker nuovo (temp_id) => annulla la creazione
+    if (props.temp_id) {
+      this.createdDraft.delete(props.temp_id);
+      this.stopsGroup.removeLayer(st.layer);
+      this.editorState = null;
+      return;
+    }
+
+    // 2) marker DB
+    if (st.stopId == null) return;
+    const id = st.stopId;
+
+    // se era in delete, lo rimetti in mappa
+    if (this.deletedDraft.has(id)) {
+      const deletedMarker = this.deletedMarkersById.get(id);
+      if (deletedMarker) this.leafMapService.restoreStopFromDeleted(deletedMarker); //non so se giusto
+
+      this.deletedDraft.delete(id);
+      this.deletedMarkersById.delete(id);
+    }
+
+    // baseline
+    const base = this.baselineStopsById.get(id);
+    if (!base) return;
+
+    // ripristina posizione
+    st.layer.setLatLng([base.lat, base.lng]);
+
+    // ripristina nome in properties
+    layerAny.feature = layerAny.feature ?? { type: 'Feature', properties: {} };
+    layerAny.feature.properties = {
+      ...layerAny.feature.properties,
+      name: base.name,
+    };
+
+    // aggiorna pannello
+    st.name = base.name;
+    st.lat = base.lat;
+    st.lng = base.lng;
+
+    // rimuove eventuale update pendente
+    this.updatedDraft.delete(id);
+    this.leafMapService.setStopIconNormal(st.layer);
+
+    // popup coerente
+    st.layer.bindPopup?.(`stop_id: ${id}<br/>${base.name}`);
+  }
+
+  resetAllDraftChanges(): void {
+    // 1) rimuovi marker nuovi (temp_id)
+    const tempMarkers: L.Marker[] = [];
+    this.stopsGroup.eachLayer((l: any) => {
+      const props = l?.feature?.properties;
+      if (props?.temp_id) tempMarkers.push(l as L.Marker);
+    });
+    tempMarkers.forEach((m) => this.stopsGroup.removeLayer(m));
+
+    // 2) ripristina delete: rimetti marker DB eliminati
+    for (const id of this.deletedDraft.values()) {
+      const marker = this.deletedMarkersById.get(id);
+      if (marker) this.leafMapService.restoreStopFromDeleted(marker);
+    }
+
+    // 3) ripristina update: torna ai valori baseline
+    for (const [id] of this.updatedDraft) {
+      const base = this.baselineStopsById.get(id);
+      if (!base) continue;
+
+      const marker = this.leafMapService.findStopMarkerByStopId(id);
+      if (!marker) continue;
+
+      marker.setLatLng([base.lat, base.lng]);
+      this.leafMapService.setStopIconNormal(marker);
+
+      const anyMarker: any = marker;
+      anyMarker.feature = anyMarker.feature ?? { type: 'Feature', properties: {} };
+      anyMarker.feature.properties = {
+        ...anyMarker.feature.properties,
+        name: base.name,
+      };
+
+      marker.bindPopup?.(`stop_id: ${id}<br/>${base.name}`);
+    }
+
+    // 4) svuota draft + cache delete
+    this.createdDraft.clear();
+    this.updatedDraft.clear();
+    this.deletedDraft.clear();
+    this.deletedMarkersById.clear();
+
+    // 5) reset UI
+    this.editorState = null;
+  }
+
+  //panel
+
+toggleStopPanel(): void {
+  if (this.openPanel === 'stop') {
+    this.openPanel = null;
+    this.editorMode = 'idle';
+  } else {
+    this.openPanel = 'stop';
+    this.editorMode = 'stop-edit';
+  }
 }
-  
+
+toggleLinePanel(): void {
+  if (this.openPanel === 'line') {
+    this.openPanel = null;
+    this.editorMode = 'idle';
+  } else {
+    this.openPanel = 'line';
+    this.editorMode = 'line-create';
+  }
+}
 }

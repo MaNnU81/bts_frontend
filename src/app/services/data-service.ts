@@ -86,6 +86,5 @@ export class DataService {
     const url = `${this.baseUrl}/batch/stops`;
     return this.http.post<StopBatchResponseDto>(url, request);
   }
-
   
 }

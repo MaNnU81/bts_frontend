@@ -1,44 +1,103 @@
-<!-- <div class="panel">
-  <h2 class="title">Stop editor</h2>
+<section class="dashboard">
+  <!-- <h2 class="dashboard__title">Stop editor</h2> -->
 
+  <!-- ======= GLOBAL ACTIONS (sempre visibili) ======= -->
+  <div class="dashboard__actions">
+    <div class="badge">
+      Modifiche pendenti: <strong>{{ pendingCount }}</strong>
+    </div>
+
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="onSaveAll()"
+      [disabled]="pendingCount === 0">
+      SAVE (DB)
+    </button>
+
+    <!-- 🔁 RESET TOTALE -->
+    <button
+      mat-raised-button
+      color="warn"
+      (click)="onResetAll()"
+      [disabled]="pendingCount === 0">
+      Reset modifiche
+    </button>
+  </div>
+
+  <mat-divider></mat-divider>
+
+  <!-- ======= EDITOR STATE ======= -->
   @if (state) {
     <div class="badge">
-      Modalità: <strong>{{ state.mode === 'create' ? 'NUOVO' : 'MODIFICA' }}</strong>
+      Modalità:
+      <strong>{{ state.mode === 'create' ? 'NUOVO' : 'MODIFICA' }}</strong>
     </div>
 
-    <div class="field">
-      <label>ID</label>
-      <div class="readonly">{{ state.stopId ?? '— (DB assegna)' }}</div>
+    <!-- ID (readonly) -->
+    <mat-form-field appearance="outline" class="dashboard__field">
+      <mat-label>ID</mat-label>
+      <input
+        matInput
+        [value]="state.stopId ?? '-ID- Assegnato dal DB'"
+        readonly />
+    </mat-form-field>
+
+    <!-- Nome fermata -->
+    <mat-form-field appearance="outline" class="dashboard__field">
+      <mat-label>Nome fermata</mat-label>
+      <input
+        matInput
+        [(ngModel)]="state.name"
+        placeholder="Es. Brignole" />
+    </mat-form-field>
+
+    <!-- Lat/Lng (readonly) -->
+    <div class="dashboard__grid2">
+      <mat-form-field appearance="outline" class="dashboard__field">
+        <mat-label>Lat</mat-label>
+        <input matInput [value]="state.lat ?? '—'" readonly />
+      </mat-form-field>
+
+      <mat-form-field appearance="outline" class="dashboard__field">
+        <mat-label>Lng</mat-label>
+        <input matInput [value]="state.lng ?? '—'" readonly />
+      </mat-form-field>
     </div>
 
-    <div class="field">
-      <label>Nome fermata</label>
-      <input [(ngModel)]="state.name" placeholder="Es. Brignole" />
-    </div>
-
-    <div class="field grid2">
-      <div>
-        <label>Lat</label>
-        <div class="readonly">{{ state.lat ?? '—' }}</div>
-      </div>
-      <div>
-        <label>Lng</label>
-        <div class="readonly">{{ state.lng ?? '—' }}</div>
-      </div>
-    </div>
-
-    <div class="actions">
+    <div class="dashboard__actions">
       <button
-        class="btn"
-        (click)="onSave()"
+        mat-raised-button
+        color="primary"
+        (click)="onApplyDraft()"
         [disabled]="!state.name.trim()">
-        Salva (UI)
+        Applica (draft)
       </button>
-      <button class="btn ghost" (click)="onCancel()">Annulla</button>
+
+      <button
+        mat-raised-button
+        color="warn"
+        (click)="onDeleteCurrent()"
+        [disabled]="state.mode !== 'edit'">
+        Elimina fermata
+      </button>
+
+      <!-- ↩️ UNDO SINGOLO -->
+      <button
+        mat-raised-button
+        (click)="onRestoreCurrent()">
+        Ripristina fermata
+      </button>
+
+      <button
+        mat-raised-button
+        (click)="onCancel()">
+        Annulla
+      </button>
     </div>
   } @else {
     <div class="empty">
       Seleziona una fermata sulla mappa oppure crea un nuovo marker.
     </div>
   }
-</div> -->
+</section>

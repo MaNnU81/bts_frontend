@@ -58,8 +58,8 @@ body {
   ));
 
     @include mat.form-field-overrides((
-    disabled-leading-icon-color: red,
-    outlined-input-text-color: rgb(253, 253, 253),
+    disabled-leading-icon-color: rgba(10, 10, 10, 0.366),
+    outlined-input-text-color: rgb(10, 10, 10),
   ));
 
   --font-title: 'Workbench', sans-serif;

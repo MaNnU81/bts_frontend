@@ -4,13 +4,13 @@
     <div class="map-toolbar">
       <mat-slide-toggle
         [checked]="showFetchedStops"
-        (change)="showFetchedStops = $event.checked; applyFetchedVisibility()">
+        (change)="showFetchedStops = $event.checked; onVisibilityChanged()">
         Stops
       </mat-slide-toggle>
 
       <mat-slide-toggle
         [checked]="showFetchedLines"
-        (change)="showFetchedLines = $event.checked; applyFetchedVisibility()">
+        (change)="showFetchedLines = $event.checked; onVisibilityChanged()">
         Lines
       </mat-slide-toggle>
 
@@ -25,93 +25,61 @@
   </div>
 
   <!-- ================= PANEL COLUMN ================= -->
-  <div class="panel-col">
-    <section class="dashboard">
-      <h2 class="dashboard__title">Stop editor</h2>
+<div class="panel-col">
 
-      <!-- ======= GLOBAL ACTIONS (sempre visibili) ======= -->
-      <div class="dashboard__actions">
-        <div class="badge">
-          Modifiche pendenti: <strong>{{ pendingCount }}</strong>
-        </div>
+  <!-- ================= STOP PANEL (sempre visibile) ================= -->
+  <section class="dock">
+    <header class="dock__header">
+      <div class="dock__title">Stop editor</div>
 
-        <button
-          matButton="elevated"
-          color="primary"
-          (click)="saveAllToDb()"
-          [disabled]="pendingCount === 0">
-          SAVE (DB)
-        </button>
+      <span class="dock__spacer"></span>
+
+      <button mat-stroked-button (click)="toggleStopPanel()">
+        <mat-icon>{{ openPanel === 'stop' ? 'close' : 'add' }}</mat-icon>
+        {{ openPanel === 'stop' ? 'Chiudi' : 'Apri' }}
+      </button>
+    </header>
+
+    @if (openPanel === 'stop') {
+      <div class="dock__content">
+        <app-stop-editor-panel-component
+          [state]="editorState"
+          [pendingCount]="pendingCount"
+          (saveAll)="saveAllToDb()"
+          (applyDraft)="applyStopToDraft()"
+          (deleteCurrent)="markDeleteCurrent()"
+          (cancel)="cancelSelection()"
+          (restoreCurrent)="restoreCurrentStop()"
+          (resetAll)="resetAllDraftChanges()">
+        </app-stop-editor-panel-component>
       </div>
+    }
+  </section>
 
-      <mat-divider></mat-divider>
+  <!-- ================= LINE PANEL (sempre visibile) ================= -->
+  <section class="dock">
+    <header class="dock__header">
+      <div class="dock__title">Line editor</div>
 
-      <!-- ======= EDITOR STATE ======= -->
-      @if (editorState) {
-        <div class="badge">
-          Modalità:
-          <strong>{{ editorState.mode === 'create' ? 'NUOVO' : 'MODIFICA' }}</strong>
-        </div>
+      <span class="dock__spacer"></span>
 
-        <!-- ID (readonly) -->
-        <mat-form-field appearance="outline" class="dashboard__field">
-          <mat-label>ID</mat-label>
-          <input
-            matInput
-            [value]="editorState.stopId ?? '-ID- Assegnato dal DB'"
-            readonly />
-        </mat-form-field>
+      <button mat-stroked-button (click)="toggleLinePanel()">
+        <mat-icon>{{ openPanel === 'line' ? 'close' : 'add' }}</mat-icon>
+        {{ openPanel === 'line' ? 'Chiudi' : 'Apri' }}
+      </button>
+    </header>
 
-        <!-- Nome fermata -->
-        <mat-form-field appearance="outline" class="dashboard__field">
-          <mat-label>Nome fermata</mat-label>
-          <input
-            matInput
-            [(ngModel)]="editorState.name"
-            placeholder="Es. Brignole" />
-        </mat-form-field>
+    @if (openPanel === 'line') {
+      <div class="dock__content">
+        <app-line-editor-panel-component
+          [mode]="editorMode"
+          (close)="toggleLinePanel()"
+          (confirmSequence)="editorMode = 'line-edit'"
+          (backToCreate)="editorMode = 'line-create'">
+        </app-line-editor-panel-component>
+      </div>
+    }
+  </section>
 
-        <!-- Lat/Lng (readonly) -->
-        <div class="field grid2">
-          <mat-form-field appearance="outline" class="dashboard__field">
-            <mat-label>Lat</mat-label>
-            <input matInput [value]="editorState.lat ?? '—'" readonly />
-          </mat-form-field>
-
-          <mat-form-field appearance="outline" class="dashboard__field">
-            <mat-label>Lng</mat-label>
-            <input matInput [value]="editorState.lng ?? '—'" readonly />
-          </mat-form-field>
-        </div>
-
-        <div class="dashboard__actions">
-          <button
-            matButton="elevated"
-            color="primary"
-            (click)="applyStopToDraft()"
-            [disabled]="!editorState.name.trim()">
-            Applica (draft)
-          </button>
-
-          <button
-            matButton="elevated"
-            color="warn"
-            (click)="markDeleteCurrent()"
-            [disabled]="editorState.mode !== 'edit'">
-            Elimina fermata
-          </button>
-
-          <button
-            matButton="elevated"
-            (click)="cancelSelection()">
-            Annulla
-          </button>
-        </div>
-      } @else {
-        <div class="empty">
-          Seleziona una fermata sulla mappa oppure crea un nuovo marker.
-        </div>
-      }
-    </section>
-  </div>
 </div>
+
