@@ -19,6 +19,7 @@ import { MatIconModule } from '@angular/material/icon';
 import {
   LineEditorPanelComponent,
 } from '../line-editor-panel-component/line-editor-panel-component';
+import { N } from '@angular/cdk/keycodes';
 
 type StopEditorMode = 'create' | 'edit';
 
@@ -34,7 +35,14 @@ type StopEditorState = {
 type EditorPanel = 'stop' | 'line' | null;
 type EditorMode = 'idle' | 'stop-edit' | 'line-create' | 'line-edit';
 
+type StopRef = {
+  id: number;
+  name: string;
+  lat: number;
+  lng: number;
+};
 
+type StopIndexItem = StopRef;
 
 @Component({
   selector: 'app-leaflet-add',
@@ -70,6 +78,14 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
   private tmpCounter = 1;
 
+
+  //search stops id e name
+
+  stopIndex: StopIndexItem[] = [];
+  lineSelectedStops: StopRef[] = [];
+  lineSearch = '';
+  private lineDraftPolyline?: L.Polyline;  //polyline bozza
+
   private stopsGeoLayer?: L.GeoJSON;
   private linesGeoLayer?: L.GeoJSON;
 
@@ -86,8 +102,19 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
   private sub?: Subscription;
 
-openPanel: EditorPanel = null;   
-editorMode: EditorMode = 'idle';
+  openPanel: EditorPanel = null;   
+  editorMode: EditorMode = 'idle';
+
+
+  //linee cliccabili
+  private selectedLineLayer: L.Path | null = null;
+  selectedLineInfo: { id: number | null; number?: number; direction?: string; route?: string } | null = null;
+
+  //input linea 
+
+  lineNumber: number | null = null;
+  lineDirection = '';
+  lineRoute = '';
 
   constructor(private dataService: DataService, private leafMapService: LeafletService) {}
 
@@ -149,8 +176,9 @@ editorMode: EditorMode = 'idle';
         if (props?.temp_id) {
           const tempId = props.temp_id as string;
           const existing = this.createdDraft.get(tempId);
+          this.leafMapService.setStopIconUpdated(layer as L.Marker);
 
-          // se non esiste ancora in draft, lo creo (ma name magari è vuoto finché non lo compili)
+          // se non esiste ancora in draft, lo creo (ricordaresi di compilare name)
           this.createdDraft.set(tempId, {
             tempId,
             name: existing?.name ?? props.name ?? '',
@@ -174,6 +202,7 @@ editorMode: EditorMode = 'idle';
           const name = (props.name ?? '') as string;
 
           this.updatedDraft.set(id, { id, name, lat, lng });
+          this.leafMapService.setStopIconUpdated(layer as L.Marker);
 
           if (this.editorState?.layer === layer) {
             const st = this.editorState; // snapshot
@@ -268,6 +297,26 @@ editorMode: EditorMode = 'idle';
     }
   }
 
+  private buildStopIndexFromgeoJson(stopsGeoJson: any): void {
+    this.stopIndex = [];
+
+    if(stopsGeoJson?.type !== 'FeatureCollection' || !Array.isArray(stopsGeoJson.features)) return;
+
+    for (const f of stopsGeoJson.features) {
+      const id = f?.properties?.stop_id;
+      const name = (f?.properties?.name ?? '').toString();
+      const coords = f?.geometry?.coordinates;
+
+      if (typeof id !== 'number' || !Array.isArray(coords) || coords.length < 2) continue;
+      const lng = Number(coords[0]);
+      const lat = Number(coords[1]);
+
+      this.stopIndex.push({id, name, lat, lng});
+    }
+      this.stopIndex.sort((a, b) => a.id - b.id);
+
+  }
+
   private loadGeoAndRender(): void {
     this.loading = true;
     this.error = null;
@@ -279,7 +328,9 @@ editorMode: EditorMode = 'idle';
     }).subscribe({
       next: ({ stopsGeoJson, linesGeoJson }) => {
         this.buildStopsBaselineFromGeoJson(stopsGeoJson);
+        this.clearLineSelection();
         this.buildFetchedLayersFromData(stopsGeoJson, linesGeoJson);
+        this.buildStopIndexFromgeoJson(stopsGeoJson);
         this.leafMapService.applyGeoVisibility(
           this.stopsGeoLayer,
           this.linesGeoLayer,
@@ -321,7 +372,7 @@ editorMode: EditorMode = 'idle';
               layer.bindPopup(`stop_id: ${id}${name ? `<br/>${name}` : ''}`);
             }
 
-            layer.on('click', () => this.selectStopLayer(layer as L.Marker));
+            layer.on('click', () => this.onStopMarkerClicked(layer as L.Marker));
           },
         });
       } else {
@@ -333,7 +384,7 @@ editorMode: EditorMode = 'idle';
         this.linesGeoLayer = L.geoJSON(linesGeoJson, {
           style: (feature: any) => {
             const color = feature?.properties?.color ?? '#1E88E5';
-            return { color, weight: 4, opacity: 0.9 };
+            return { color, weight: 7, opacity: 0.9  };
           },
           onEachFeature: (feature: any, layer: any) => {
             const id = feature?.properties?.transport_line_id;
@@ -347,6 +398,8 @@ editorMode: EditorMode = 'idle';
                   : `transport_line_id: ${id}`;
               layer.bindPopup(label);
             }
+
+            layer.on('click', () => this.onLineLayerClicked(layer as L.Path));
           },
         });
       } else {
@@ -358,6 +411,20 @@ editorMode: EditorMode = 'idle';
       this.linesGeoLayer = undefined;
     }
   }
+
+  private onStopMarkerClicked(marker: L.Marker): void {
+    const props = (marker as any)?.feature?.properties ?? {};
+
+    if(this.openPanel === 'line' && this.editorMode === 'line-create') {
+    const id = Number(props?.stop_id);
+    if(!Number.isFinite(id)) return;
+    this.addStopToLineById(id);
+    return;
+    }
+    this.selectStopLayer(marker);
+  }
+
+
 
   private selectStopLayer(layer: L.Marker, forceCreateMode = false): void {
     if (this.openPanel === 'line') return;
@@ -644,4 +711,134 @@ toggleLinePanel(): void {
     this.editorMode = 'line-create';
   }
 }
+
+
+//FUNZIONI di gestione aggiunt/rimozione/reorder stop nella linea in creazione
+
+
+private refreshLineDraftPolyline(): void {
+
+  const latlngs: L.LatLngExpression[] = this.lineSelectedStops.map(s => [s.lat, s.lng]);
+
+  // se meno di 2 punti: niente linea
+  if(latlngs.length <2) {
+    if(this.lineDraftPolyline){
+      this.linesGroup.removeLayer(this.lineDraftPolyline);
+      this.lineDraftPolyline = undefined;
+    }
+    return;
+  }
+//se non esiste crea e aggiungi al grouplines
+  if(!this.lineDraftPolyline){
+    this.lineDraftPolyline = L.polyline(latlngs, {weight: 4, opacity: 0.7}as any);
+    this.linesGroup.addLayer(this.lineDraftPolyline);
+    return;
+  }
+//se esiste aggiorna
+  this.lineDraftPolyline.setLatLngs(latlngs);
+}
+
+addStopToLineById(stopId: number): void {
+  const stop = this.stopIndex.find(s => s.id === stopId);
+
+  if (!stop) return;
+
+  if(this.lineSelectedStops.some(s => s.id === stopId)) return; //già presente
+
+  this.lineSelectedStops.push({...stop});
+
+  this.refreshLineDraftPolyline();
+}
+
+removeStopFromLine(index: number): void {
+  if(index <0 || index >= this.lineSelectedStops.length) return;
+
+  this.lineSelectedStops.splice(index, 1);
+  this.refreshLineDraftPolyline();
+}
+
+moveStopUp(index: number): void {
+  if(index <=0 || index >= this.lineSelectedStops.length) return;
+  const temp = this.lineSelectedStops[index -1];;
+  this.lineSelectedStops[index -1] = this.lineSelectedStops[index];
+  this.lineSelectedStops[index] = temp;
+  this.refreshLineDraftPolyline();
+}
+
+moveStopDown(index: number): void {
+  if(index <0 || index >= this.lineSelectedStops.length -1) return;
+  const temp = this.lineSelectedStops[index +1];;
+  this.lineSelectedStops[index +1] = this.lineSelectedStops[index];
+  this.lineSelectedStops[index] = temp;
+  this.refreshLineDraftPolyline();
+}
+
+get lineSearchResults(): StopIndexItem[] {
+  const q = (this.lineSearch ?? '').trim().toLowerCase();
+  if (!q) return [];
+
+  const isId = /^\d+$/.test(q);
+  const results = this.stopIndex.filter(s => {
+    if (isId) return s.id === Number(q);
+    return s.name.toLowerCase().includes(q) || String(s.id).includes(q);
+  });
+
+  return results.slice(0, 20);
+}
+
+//linee cliccabili
+
+private onLineLayerClicked(layer: L.Path): void {
+  this.selectLineLayer(layer);
+}
+
+private selectLineLayer(layer: L.Path): void {
+  // 1) se clicchi la stessa linea: toggle (facoltativo)
+  if (this.selectedLineLayer === layer) {
+    this.clearLineSelection();
+    return;
+  }
+
+  // 2) ripristina stile della precedente selezionata
+  this.restoreLineStyle(this.selectedLineLayer);
+
+  // 3) imposta nuova selezione
+  this.selectedLineLayer = layer;
+
+  // 4) highlight (solo visivo)
+  this.applySelectedLineStyle(layer);
+
+  // 5) info per UI (facoltativo)
+  const props = (layer as any)?.feature?.properties ?? {};
+  const id = props?.transport_line_id != null ? Number(props.transport_line_id) : null;
+
+  this.selectedLineInfo = {
+    id,
+    number: props?.number != null ? Number(props.number) : undefined,
+    direction: props?.direction ?? undefined,
+    route: props?.route ?? undefined,
+  };
+}
+
+private clearLineSelection(): void {
+  this.restoreLineStyle(this.selectedLineLayer);
+  this.selectedLineLayer = null;
+  this.selectedLineInfo = null;
+}
+
+private applySelectedLineStyle(layer: L.Path): void {
+  // highlight semplice: aumenta weight e opacity
+  layer.setStyle({ weight: 7, opacity: 1,  dashArray: '4 12' } as any);
+}
+
+private restoreLineStyle(layer: L.Path | null): void {
+  if (!layer) return;
+
+  // ripristino in modo deterministico usando le properties della feature (come nello style callback)
+  const props = (layer as any)?.feature?.properties ?? {};
+  const color = props?.color ?? '#1E88E5';
+  layer.setStyle({ color, weight: 7, opacity: 0.9, dashArray: null, } as any);
+}
+
+
 }
