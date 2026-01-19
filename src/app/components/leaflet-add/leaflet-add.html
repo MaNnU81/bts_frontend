@@ -25,7 +25,7 @@
   <!-- ================= PANEL COLUMN ================= -->
   <div class="panel-col">
 
-    <!-- ================= STOP PANEL (sempre visibile) ================= -->
+    <!-- ================= STOP PANEL  ================= -->
     <section class="dock">
       <header class="dock__header">
         <div class="dock__title">Stop editor</div>
@@ -48,7 +48,7 @@
       }
     </section>
 
-    <!-- ================= LINE PANEL (sempre visibile) ================= -->
+    <!-- ================= LINE PANEL  ================= -->
     <section class="dock">
       <header class="dock__header">
         <div class="dock__title">Line editor</div>
@@ -63,12 +63,14 @@
 
       @if (openPanel === 'line') {
       <div class="dock__content">
-        <app-line-editor-panel-component [mode]="editorMode" [lineNumber]="lineNumber" [lineDirection]="lineDirection"
+        <app-line-editor-panel-component [hasSelectedLine]="selectedLineLayer  !== null" [mode]="editorMode === 'line-edit' ? 'line-edit' : 'line-create'" [lineNumber]="lineNumber" [lineDirection]="lineDirection"
           [lineRoute]="lineRoute" (lineNumberChange)="lineNumber = $event"
           (lineDirectionChange)="lineDirection = $event" (lineRouteChange)="lineRoute = $event" [search]="lineSearch"
           [results]="lineSearchResults" [selectedStops]="lineSelectedStops" (searchChange)="lineSearch = $event"
           (addStop)="addStopToLineById($event)" (removeAt)="removeStopFromLine($event)" (moveUp)="moveStopUp($event)"
-          (moveDown)="moveStopDown($event)">
+          (moveDown)="moveStopDown($event)" (enterEdit)="enterLineEditMode()" (exitEdit)="exitLineEditMode()"[lineColor]="lineColor"
+(lineColorChange)="lineColor = $event; refreshLineDraftPolyline()"
+(saveDraft)="saveLineDraft()">
         </app-line-editor-panel-component>
       </div>
       }

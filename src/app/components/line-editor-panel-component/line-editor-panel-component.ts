@@ -9,6 +9,7 @@ import { MatDividerModule } from '@angular/material/divider';
 
 
 export type EditorMode = 'idle' | 'stop-edit' | 'line-create' | 'line-edit';
+export type LinePanelMode = 'line-create' | 'line-edit';
 export type StopRef = { id: number; name: string; lat: number; lng: number };
 @Component({
   selector: 'app-line-editor-panel-component',
@@ -18,7 +19,7 @@ export type StopRef = { id: number; name: string; lat: number; lng: number };
   styleUrl: './line-editor-panel-component.scss',
 })
 export class LineEditorPanelComponent {
-  @Input() mode: EditorMode = 'line-create';
+  @Input() mode: LinePanelMode = 'line-create';
   @Input() search = '';
   @Input() results: StopRef[] = [];
   @Input() selectedStops: StopRef[] = [];
@@ -39,4 +40,27 @@ export class LineEditorPanelComponent {
 @Output() lineNumberChange = new EventEmitter<number | null>();
 @Output() lineDirectionChange = new EventEmitter<string>();
 @Output() lineRouteChange = new EventEmitter<string>();
+
+@Output() enterEdit = new EventEmitter<void>();
+@Output() exitEdit = new EventEmitter<void>();
+
+
+@Input() hasSelectedLine = false;
+
+@Input() lineColor = '#FF9800';
+@Output() lineColorChange = new EventEmitter<string>();
+
+@Output() saveDraft = new EventEmitter<void>();
+
+
+get isReadonly(): boolean {
+  // se sto editando: mai readonly
+  if (this.mode === 'line-edit') return false;
+
+  // se ho selezionato una linea esistente: blocca finché non entro in edit
+  if (this.hasSelectedLine) return true;
+
+  // altrimenti (nuova linea non selezionata): editabile
+  return false;
+}
 }

@@ -1,8 +1,6 @@
 <section class="dashboard">
 
-  @if (mode === 'line-create') {
-
-  <!-- ================= LINE METADATA ================= -->
+  <!-- ================= LINE METADATA (sempre visibili) ================= -->
   <mat-form-field appearance="outline" class="dashboard__field">
     <mat-label>Numero linea</mat-label>
     <input
@@ -10,15 +8,17 @@
       type="number"
       [ngModel]="lineNumber"
       (ngModelChange)="lineNumberChange.emit($event)"
+      [readonly]="isReadonly"
       placeholder="Es. 12" />
   </mat-form-field>
 
-    <mat-form-field appearance="outline" class="dashboard__field">
+  <mat-form-field appearance="outline" class="dashboard__field">
     <mat-label>Route</mat-label>
     <input
       matInput
       [ngModel]="lineRoute"
       (ngModelChange)="lineRouteChange.emit($event)"
+      [readonly]="isReadonly"
       placeholder="Es. Polo Universitario - Stazione" />
   </mat-form-field>
 
@@ -28,71 +28,109 @@
       matInput
       [ngModel]="lineDirection"
       (ngModelChange)="lineDirectionChange.emit($event)"
+      [readonly]="isReadonly"
       placeholder="Es. Stazione" />
   </mat-form-field>
 
+  <mat-form-field appearance="outline" class="dashboard__field">
+  <mat-label>Colore linea</mat-label>
+  <input
+    matInput
+    type="color"
+    [ngModel]="lineColor"
+    (ngModelChange)="lineColorChange.emit($event)"
+    [disabled]="isReadonly" />
+</mat-form-field>
+
+  <!-- ================= ACTIONS (sempre visibili) ================= -->
+  <div class="dashboard__actions">
+    @if (mode === 'line-edit') {
+      <button mat-raised-button color="warn" (click)="exitEdit.emit()">
+        Esci da Modifica
+      </button>
+    } @else {
+      <button
+        mat-raised-button
+        color="primary"
+        (click)="enterEdit.emit()"
+        [disabled]="!hasSelectedLine">
+        Modifica Linea
+      </button>
+    }
+  </div>
+
   <mat-divider></mat-divider>
 
-  <!-- ================= STOP SEARCH ================= -->
-  <mat-form-field appearance="outline" class="dashboard__field">
-    <mat-label>Cerca Stop</mat-label>
-    <input
-      matInput
-      [(ngModel)]="search"
-      (ngModelChange)="searchChange.emit($event)"
-      placeholder="Es. 12 oppure Stazione" />
-  </mat-form-field>
+  <!-- ================= BODY: CREATE vs EDIT ================= -->
+  @if (mode === 'line-create') {
 
-  @if (results.length > 0) {
-  <div class="results">
-    @for (r of results; track r.id) {
-    <button
-      mat-stroked-button
-      class="results__item"
-      (click)="addStop.emit(r.id)">
-      #{{ r.id }} — {{ r.name || '(senza nome)' }}
-    </button>
+    <!-- ================= STOP SEARCH ================= -->
+    <mat-form-field appearance="outline" class="dashboard__field">
+      <mat-label>Cerca Stop</mat-label>
+      <input
+        matInput
+        [ngModel]="search"
+        (ngModelChange)="searchChange.emit($event)"
+        placeholder="Es. 12 oppure Stazione" />
+    </mat-form-field>
+
+    @if (results.length > 0) {
+      <div class="results">
+        @for (r of results; track r.id) {
+          <button
+            mat-stroked-button
+            class="results__item"
+            (click)="addStop.emit(r.id)">
+            #{{ r.id }} — {{ r.name || '(senza nome)' }}
+          </button>
+        }
+      </div>
     }
-  </div>
-  }
 
-  <div class="badge">
-    Selezionate: <strong>{{ selectedStops.length }}</strong> stop
-  </div>
-
-  @if (selectedStops.length === 0) {
-  <div class="empty">
-    Aggiungi fermate dalla ricerca o cliccando i marker sulla mappa.
-  </div>
-  } @else {
-  <div class="selected">
-    @for (s of selectedStops; track s.id; let i = $index) {
-    <div class="selected__row">
-      <div class="selected__label">
-        <strong>{{ i + 1 }}.</strong>
-        #{{ s.id }} — {{ s.name || '(senza nome)' }}
-      </div>
-
-      <div class="selected__actions">
-        <button mat-button (click)="moveUp.emit(i)" [disabled]="i === 0">
-          Su
-        </button>
-        <button mat-button (click)="moveDown.emit(i)" [disabled]="i === selectedStops.length - 1">
-          Giù
-        </button>
-        <button mat-button color="warn" (click)="removeAt.emit(i)">
-          Rimuovi
-        </button>
-      </div>
+    <div class="badge">
+      Selezionate: <strong>{{ selectedStops.length }}</strong> stop
     </div>
+
+    @if (selectedStops.length === 0) {
+      <div class="empty">
+        Aggiungi fermate dalla ricerca o cliccando i marker sulla mappa.
+      </div>
+    } @else {
+      <div class="selected">
+        @for (s of selectedStops; track s.id; let i = $index) {
+          <div class="selected__row">
+            <div class="selected__label">
+              <strong>{{ i + 1 }}.</strong>
+              #{{ s.id }} — {{ s.name || '(senza nome)' }}
+            </div>
+
+            <div class="selected__actions">
+              <button mat-button (click)="moveUp.emit(i)" [disabled]="i === 0">
+                Su
+              </button>
+              <button mat-button (click)="moveDown.emit(i)" [disabled]="i === selectedStops.length - 1">
+                Giù
+              </button>
+              <button mat-button color="warn" (click)="removeAt.emit(i)">
+                Rimuovi
+              </button>
+            </div>
+          </div>
+        }
+      </div>
     }
-  </div>
-  }
 
   } @else {
-  <div class="empty">
-    Per ora gestiamo solo la creazione (sequenza + polyline).
-  </div>
+    <div class="empty">
+      Modalità modifica: usa i controlli Leaflet per spostare/aggiungere vertici sulla linea.
+    </div>
   }
+
+  @if (mode === 'line-create') {
+  <button mat-raised-button color="primary" (click)="saveDraft.emit()"
+    [disabled]="selectedStops.length < 2">
+    Salva in draft
+  </button>
+}
 
 </section>

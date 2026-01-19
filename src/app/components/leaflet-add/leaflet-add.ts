@@ -1,11 +1,7 @@
 import { AfterViewInit, Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
-import { FormsModule } from '@angular/forms';
 import { forkJoin, Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
-import { MatFormFieldModule } from '@angular/material/form-field';
-import { MatSelectModule } from '@angular/material/select';
-import { MatInputModule } from '@angular/material/input';
 import { LeafletService } from '../../services/leaflet-service';
 import { StopEditorPanelComponent } from '../stop-editor-panel-component/stop-editor-panel-component';
 
@@ -14,12 +10,8 @@ import 'leaflet-draw';
 
 import { MatSlideToggleModule } from '@angular/material/slide-toggle';
 import { DataService } from '../../services/data-service';
-import { MatDivider } from '@angular/material/divider';
 import { MatIconModule } from '@angular/material/icon';
-import {
-  LineEditorPanelComponent,
-} from '../line-editor-panel-component/line-editor-panel-component';
-import { N } from '@angular/cdk/keycodes';
+import { LineEditorPanelComponent } from '../line-editor-panel-component/line-editor-panel-component';
 
 type StopEditorMode = 'create' | 'edit';
 
@@ -48,13 +40,9 @@ type StopIndexItem = StopRef;
   selector: 'app-leaflet-add',
   standalone: true,
   imports: [
-    MatInputModule,
-    MatSelectModule,
-    MatFormFieldModule,
     MatButtonModule,
     MatIconModule,
     CommonModule,
-    FormsModule,
     MatSlideToggleModule,
     StopEditorPanelComponent,
     LineEditorPanelComponent,
@@ -64,6 +52,10 @@ type StopIndexItem = StopRef;
 })
 export class LeafletAdd implements AfterViewInit, OnDestroy {
   private map!: L.Map;
+  private stopDrawControl?: L.Control.Draw;
+  private lineDrawControl?: L.Control.Draw;
+  private lineEditGroup!: L.FeatureGroup;
+  private activeDrawTool: 'none' | 'stop' | 'line' = 'none';
 
   private createdDraft = new Map<
     string,
@@ -107,7 +99,7 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
 
   //linee cliccabili
-  private selectedLineLayer: L.Path | null = null;
+  public selectedLineLayer: L.Path | null = null;
   selectedLineInfo: { id: number | null; number?: number; direction?: string; route?: string } | null = null;
 
   //input linea 
@@ -115,6 +107,8 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
   lineNumber: number | null = null;
   lineDirection = '';
   lineRoute = '';
+
+  lineColor = '#FF9800';
 
   constructor(private dataService: DataService, private leafMapService: LeafletService) {}
 
@@ -136,6 +130,7 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     this.map = map;
     this.stopsGroup = stopsGroup;
     this.linesGroup = linesGroup;
+    
 
     this.initDrawAndEvents();
     this.loadGeoAndRender();
@@ -146,137 +141,247 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     this.leafMapService.destroy();
   }
 
-  private initDrawAndEvents(): void {
-    // Draw: SOLO MARKER
 
-    const drawControl = new L.Control.Draw({
-      edit: {
-        featureGroup: this.stopsGroup,
-        remove: true,
-      },
-      draw: {
-        marker: {},
-        polyline: false,
-        polygon: false,
-        rectangle: false,
-        circle: false,
-        circlemarker: false,
-      } as any,
-    });
+private initDrawAndEvents(): void {
+  // gruppo dedicato per edit line (conterrà SOLO la linea selezionata in line-edit)
+  this.lineEditGroup = new L.FeatureGroup();
+  this.map.addLayer(this.lineEditGroup);
 
-    this.map.addControl(drawControl as any);
-    this.map.on(L.Draw.Event.EDITED, (e: any) => {
-      e.layers.eachLayer((layer: any) => {
-        if (!layer.getLatLng) return;
+  // --- STOP tools (marker only) ---
+  this.stopDrawControl = new L.Control.Draw({
+    edit: {
+      featureGroup: this.stopsGroup,
+      remove: true,
+    },
+    draw: {
+      marker: {},
+      polyline: false,
+      polygon: false,
+      rectangle: false,
+      circle: false,
+      circlemarker: false,
+    } as any,
+  });
 
-        const props = layer?.feature?.properties;
-        const { lat, lng } = layer.getLatLng();
+  // --- LINE tools (per ora: SOLO EDIT sulla linea selezionata dentro lineEditGroup) ---
+  this.lineDrawControl = new L.Control.Draw({
+    edit: {
+      featureGroup: this.lineEditGroup,
+      remove: false,
+    },
+    draw: {
+      polyline: false,
+      marker: false,
+      polygon: false,
+      rectangle: false,
+      circle: false,
+      circlemarker: false,
+    } as any,
+  });
 
-        // NUOVO marker
-        if (props?.temp_id) {
-          const tempId = props.temp_id as string;
-          const existing = this.createdDraft.get(tempId);
-          this.leafMapService.setStopIconUpdated(layer as L.Marker);
+  // listeners UNA VOLTA, poi smisti
+  this.map.on(L.Draw.Event.CREATED, (e: any) => this.onDrawCreated(e));
+  this.map.on(L.Draw.Event.EDITED, (e: any) => this.onDrawEdited(e));
+  this.map.on(L.Draw.Event.DELETED, (e: any) => this.onDrawDeleted(e));
 
-          // se non esiste ancora in draft, lo creo (ricordaresi di compilare name)
-          this.createdDraft.set(tempId, {
-            tempId,
-            name: existing?.name ?? props.name ?? '',
-            lat,
-            lng,
-          });
+  // stato iniziale: niente tools (li attivi via toggle panel)
+  this.setActiveDrawTool('none');
 
-          // aggiorna sidebar se è selezionato
-          if (this.editorState?.layer === layer) {
-            const st = this.editorState; // snapshot
-            if (!st) return;
-            st.lat = lat;
-            st.lng = lng;
-          }
-          return;
-        }
+  setTimeout(() => this.map.invalidateSize(), 0);
+}
 
-        // ESISTENTE (DB)
-        if (props?.stop_id) {
-          const id = Number(props.stop_id);
-          const name = (props.name ?? '') as string;
+/** Switch dei controlli in alto a sinistra */
+private setActiveDrawTool(tool: 'none' | 'stop' | 'line'): void {
+  if (this.activeDrawTool === tool) return;
 
-          this.updatedDraft.set(id, { id, name, lat, lng });
-          this.leafMapService.setStopIconUpdated(layer as L.Marker);
+  // rimuovi entrambi (se presenti)
+  if (this.stopDrawControl) this.map.removeControl(this.stopDrawControl);
+  if (this.lineDrawControl) this.map.removeControl(this.lineDrawControl);
 
-          if (this.editorState?.layer === layer) {
-            const st = this.editorState; // snapshot
-            if (!st) return;
-            st.lat = lat;
-            st.lng = lng;
-          }
-        }
-      });
-    });
+  // aggiungi quello richiesto
+  if (tool === 'stop' && this.stopDrawControl) this.map.addControl(this.stopDrawControl);
+  if (tool === 'line' && this.lineDrawControl) this.map.addControl(this.lineDrawControl);
 
-    // CREATE marker -> draft + sidebar
-    this.map.on(L.Draw.Event.CREATED, (event: any) => {
-      const layer: L.Layer = event.layer;
-      const layerType: string = event.layerType;
+  this.activeDrawTool = tool;
+}
 
-      if (layerType !== 'marker') return;
+/** Dispatcher: chiama questo quando cambi openPanel/editorMode */
+private syncDrawToolsWithUi(): void {
+  if (this.openPanel === 'stop') {
+    this.setActiveDrawTool('stop');
+    return;
+  }
 
-      // Aggiungo subito alla mappa
-      this.stopsGroup.addLayer(layer);
+  if (this.openPanel === 'line') {
+    // in line-create: niente draw tools (costruisci la polyline unendo stop)
+    // in line-edit: attiva tool linea
+    this.setActiveDrawTool(this.editorMode === 'line-edit' ? 'line' : 'none');
+    return;
+  }
 
-      // Assicuro feature/properties
-      (layer as any).feature = (layer as any).feature ?? { type: 'Feature', properties: {} };
-      (layer as any).feature.properties = {
-        ...(layer as any).feature.properties,
-        kind: 'stop',
-      };
+  this.setActiveDrawTool('none');
+}
 
-      const tempId = this.newTempId();
-      (layer as any).feature.properties.temp_id = tempId;
+/** === DISPATCH DRAW EVENTS === */
+private onDrawCreated(event: any): void {
+  if (this.activeDrawTool === 'stop') {
+    this.handleStopCreated(event);
+    return;
+  }
+
+  if (this.activeDrawTool === 'line') {
+    this.handleLineCreated(event);
+    return;
+  }
+}
+
+private onDrawEdited(event: any): void {
+  if (this.activeDrawTool === 'stop') {
+    this.handleStopEdited(event);
+    return;
+  }
+
+  if (this.activeDrawTool === 'line') {
+    this.handleLineEdited(event);
+    return;
+  }
+}
+
+private onDrawDeleted(event: any): void {
+  if (this.activeDrawTool === 'stop') {
+    this.handleStopDeleted(event);
+    return;
+  }
+
+  if (this.activeDrawTool === 'line') {
+    this.handleLineDeleted(event);
+    return;
+  }
+}
+
+/** === STOP HANDLERS (copiati dalla tua versione, uguali) === */
+private handleStopCreated(event: any): void {
+  const layer: L.Layer = event.layer;
+  const layerType: string = event.layerType;
+
+  if (layerType !== 'marker') return;
+
+  // Aggiungo subito alla mappa
+  this.stopsGroup.addLayer(layer);
+
+  // Assicuro feature/properties
+  (layer as any).feature = (layer as any).feature ?? { type: 'Feature', properties: {} };
+  (layer as any).feature.properties = {
+    ...(layer as any).feature.properties,
+    kind: 'stop',
+  };
+
+  const tempId = this.newTempId();
+  (layer as any).feature.properties.temp_id = tempId;
+  this.leafMapService.setStopIconUpdated(layer as L.Marker);
+
+  (layer as any).bindPopup?.(`(nuovo) temp_id: ${tempId}`);
+
+  // click seleziona
+  (layer as any).on('click', () => this.selectStopLayer(layer as L.Marker));
+
+  // seleziono subito come "create"
+  this.selectStopLayer(layer as L.Marker, true);
+}
+
+private handleStopEdited(e: any): void {
+  e.layers.eachLayer((layer: any) => {
+    if (!layer.getLatLng) return;
+
+    const props = layer?.feature?.properties;
+    const { lat, lng } = layer.getLatLng();
+
+    // NUOVO marker
+    if (props?.temp_id) {
+      const tempId = props.temp_id as string;
+      const existing = this.createdDraft.get(tempId);
+
       this.leafMapService.setStopIconUpdated(layer as L.Marker);
 
-      (layer as any).bindPopup?.(`(nuovo) temp_id: ${tempId}`);
-
-      // click seleziona
-      (layer as any).on('click', () => this.selectStopLayer(layer as L.Marker));
-
-      // seleziono subito come "create"
-      this.selectStopLayer(layer as L.Marker, true);
-    });
-
-    // DELETE
-    this.map.on(L.Draw.Event.DELETED, (e: any) => {
-      e.layers.eachLayer((layer: any) => {
-        const props = layer?.feature?.properties;
-
-        // marker nuovo: elimina dal draft create
-        if (props?.temp_id) {
-          this.createdDraft.delete(props.temp_id);
-          return;
-        }
-
-        // marker DB: segna delete
-        if (props?.stop_id) {
-          const id = Number(props.stop_id);
-          this.deletedMarkersById.set(id, layer as L.Marker);
-          this.deletedDraft.add(id);
-          this.updatedDraft.delete(id); // se era anche in update, vince delete
-          this.leafMapService.moveStopToDeleted(layer as L.Marker);
-        }
+      // se non esiste ancora in draft, lo creo (ricordarsi di compilare name)
+      this.createdDraft.set(tempId, {
+        tempId,
+        name: existing?.name ?? props.name ?? '',
+        lat,
+        lng,
       });
 
-      // se avevi selezionato un marker cancellato
-      if (this.editorState?.layer) {
-        let stillThere = false;
-        this.stopsGroup.eachLayer((l: any) => {
-          if (l === this.editorState?.layer) stillThere = true;
-        });
-        if (!stillThere) this.editorState = null;
+      // aggiorna sidebar se è selezionato
+      if (this.editorState?.layer === layer) {
+        const st = this.editorState;
+        if (!st) return;
+        st.lat = lat;
+        st.lng = lng;
       }
-    });
+      return;
+    }
 
-    setTimeout(() => this.map.invalidateSize(), 0);
+    // ESISTENTE (DB)
+    if (props?.stop_id) {
+      const id = Number(props.stop_id);
+      const name = (props.name ?? '') as string;
+
+      this.updatedDraft.set(id, { id, name, lat, lng });
+      this.leafMapService.setStopIconUpdated(layer as L.Marker);
+
+      if (this.editorState?.layer === layer) {
+        const st = this.editorState;
+        if (!st) return;
+        st.lat = lat;
+        st.lng = lng;
+      }
+    }
+  });
+}
+
+private handleStopDeleted(e: any): void {
+  e.layers.eachLayer((layer: any) => {
+    const props = layer?.feature?.properties;
+
+    // marker nuovo: elimina dal draft create
+    if (props?.temp_id) {
+      this.createdDraft.delete(props.temp_id);
+      return;
+    }
+
+    // marker DB: segna delete
+    if (props?.stop_id) {
+      const id = Number(props.stop_id);
+      this.deletedMarkersById.set(id, layer as L.Marker);
+      this.deletedDraft.add(id);
+      this.updatedDraft.delete(id); // se era anche in update, vince delete
+      this.leafMapService.moveStopToDeleted(layer as L.Marker);
+    }
+  });
+
+  // se avevi selezionato un marker cancellato
+  if (this.editorState?.layer) {
+    let stillThere = false;
+    this.stopsGroup.eachLayer((l: any) => {
+      if (l === this.editorState?.layer) stillThere = true;
+    });
+    if (!stillThere) this.editorState = null;
   }
+}
+
+/** === LINE HANDLERS (per ora vuoti/minimi) === */
+private handleLineCreated(event: any): void {
+  // per ora non disegniamo nuove linee a mano, quindi niente
+}
+
+private handleLineEdited(event: any): void {
+  // Step successivo: qui leggeremo i latlngs della selectedLineLayer e li salveremo nel "draft line update"
+}
+
+private handleLineDeleted(event: any): void {
+  // Step successivo (se mai abiliti remove line)
+}
+
 
   private buildStopsBaselineFromGeoJson(stopsGeoJson: any): void {
     this.baselineStopsById.clear();
@@ -384,20 +489,22 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
         this.linesGeoLayer = L.geoJSON(linesGeoJson, {
           style: (feature: any) => {
             const color = feature?.properties?.color ?? '#1E88E5';
-            return { color, weight: 7, opacity: 0.9  };
+            return { color, weight: 5, opacity: 0.9  };
           },
           onEachFeature: (feature: any, layer: any) => {
             const id = feature?.properties?.transport_line_id;
             const number = feature?.properties?.number;
             const direction = feature?.properties?.direction;
 
-            if (layer.bindPopup && id != null) {
-              const label =
-                number != null
-                  ? `line ${number}${direction ? ` (${direction})` : ''}`
-                  : `transport_line_id: ${id}`;
-              layer.bindPopup(label);
-            }
+
+            //tolgo il popUp alle linee per problemi con il click select (aggiungo pero info in input)
+            // if (layer.bindPopup && id != null) {
+            //   const label =
+            //     number != null
+            //       ? `line ${number}${direction ? ` (${direction})` : ''}`
+            //       : `transport_line_id: ${id}`;
+            //   layer.bindPopup(label);
+            // }
 
             layer.on('click', () => this.onLineLayerClicked(layer as L.Path));
           },
@@ -492,6 +599,47 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
       this.leafMapService.setStopIconUpdated(layer);
     }
   }
+
+  saveLineDraft(): void {
+  // 1) deve esistere una bozza (almeno 2 stop)
+  if (this.lineSelectedStops.length < 2) {
+    alert('Servono almeno 2 fermate per creare una linea.');
+    return;
+  }
+
+  // 2) assicurati che la polyline esista e sia aggiornata
+  this.refreshLineDraftPolyline();
+  if (!this.lineDraftPolyline) return;
+
+  // 3) marca la bozza come "draft salvata" (metadata completi)
+  (this.lineDraftPolyline as any).feature = (this.lineDraftPolyline as any).feature ?? {
+    type: 'Feature',
+    properties: {}
+  };
+
+  const props = (this.lineDraftPolyline as any).feature.properties ?? {};
+  props.kind = 'line-draft';
+  props.color = this.lineColor;
+  props.number = this.lineNumber;
+  props.direction = this.lineDirection;
+  props.route = this.lineRoute;
+
+  (this.lineDraftPolyline as any).feature.properties = props;
+
+  // 4) rende la bozza selezionabile "ufficialmente"
+  // (se il click handler già c’è, ok; altrimenti lo ri-attacchi una volta)
+  this.lineDraftPolyline.off('click');
+  this.lineDraftPolyline.on('click', (e: any) => {
+    L.DomEvent.stop(e);
+    this.selectLineLayer(this.lineDraftPolyline as any);
+  });
+
+  // 5) dopo salvataggio in draft, selezionala (così puoi premere subito Modifica)
+  this.selectLineLayer(this.lineDraftPolyline as any);
+
+  alert('Linea salvata in draft (solo locale).');
+}
+
 
   saveAllToDb(): void {
     const payload = {
@@ -700,6 +848,7 @@ toggleStopPanel(): void {
     this.openPanel = 'stop';
     this.editorMode = 'stop-edit';
   }
+  this.syncDrawToolsWithUi();
 }
 
 toggleLinePanel(): void {
@@ -710,13 +859,14 @@ toggleLinePanel(): void {
     this.openPanel = 'line';
     this.editorMode = 'line-create';
   }
+   this.syncDrawToolsWithUi();
 }
 
 
 //FUNZIONI di gestione aggiunt/rimozione/reorder stop nella linea in creazione
 
 
-private refreshLineDraftPolyline(): void {
+public refreshLineDraftPolyline(): void {
 
   const latlngs: L.LatLngExpression[] = this.lineSelectedStops.map(s => [s.lat, s.lng]);
 
@@ -729,13 +879,42 @@ private refreshLineDraftPolyline(): void {
     return;
   }
 //se non esiste crea e aggiungi al grouplines
-  if(!this.lineDraftPolyline){
-    this.lineDraftPolyline = L.polyline(latlngs, {weight: 4, opacity: 0.7}as any);
-    this.linesGroup.addLayer(this.lineDraftPolyline);
-    return;
-  }
+if (!this.lineDraftPolyline) {
+
+
+  this.lineDraftPolyline = L.polyline(latlngs, { weight: 4, opacity: 0.7, color: this.lineColor } as any);
+
+  // ✅ feature/properties per riusare restoreLineStyle / info
+  (this.lineDraftPolyline as any).feature = {
+    type: 'Feature',
+    properties: {
+      kind: 'line-draft',
+      color: '#FF9800', // arancione draft, opzionale
+      number: this.lineNumber,
+      direction: this.lineDirection,
+      route: this.lineRoute,
+    }
+  };
+
+  // ✅ click: seleziona la draft line
+  this.lineDraftPolyline.on('click', (e: any) => {
+    L.DomEvent.stop(e);
+    this.selectLineLayer(this.lineDraftPolyline as any);
+  });
+
+  this.linesGroup.addLayer(this.lineDraftPolyline);
+  return;
+}
 //se esiste aggiorna
   this.lineDraftPolyline.setLatLngs(latlngs);
+  this.lineDraftPolyline.setStyle({ color: this.lineColor } as any);
+
+    const props = (this.lineDraftPolyline as any)?.feature?.properties;
+  if (props) {
+    props.number = this.lineNumber;
+    props.direction = this.lineDirection;
+    props.route = this.lineRoute;
+  }
 }
 
 addStopToLineById(stopId: number): void {
@@ -793,22 +972,15 @@ private onLineLayerClicked(layer: L.Path): void {
 }
 
 private selectLineLayer(layer: L.Path): void {
-  // 1) se clicchi la stessa linea: toggle (facoltativo)
   if (this.selectedLineLayer === layer) {
     this.clearLineSelection();
     return;
   }
 
-  // 2) ripristina stile della precedente selezionata
   this.restoreLineStyle(this.selectedLineLayer);
-
-  // 3) imposta nuova selezione
   this.selectedLineLayer = layer;
-
-  // 4) highlight (solo visivo)
   this.applySelectedLineStyle(layer);
 
-  // 5) info per UI (facoltativo)
   const props = (layer as any)?.feature?.properties ?? {};
   const id = props?.transport_line_id != null ? Number(props.transport_line_id) : null;
 
@@ -818,16 +990,29 @@ private selectLineLayer(layer: L.Path): void {
     direction: props?.direction ?? undefined,
     route: props?.route ?? undefined,
   };
+
+  // ✅ riempi gli input del pannello
+  this.lineNumber =
+    props?.number != null && props.number !== ''
+      ? Number(props.number)
+      : null;
+
+  this.lineDirection = (props?.direction ?? '').toString();
+  this.lineRoute = (props?.route ?? '').toString();
 }
 
 private clearLineSelection(): void {
   this.restoreLineStyle(this.selectedLineLayer);
   this.selectedLineLayer = null;
   this.selectedLineInfo = null;
+
+  this.lineNumber = null;
+this.lineDirection = '';
+this.lineRoute = '';
 }
 
 private applySelectedLineStyle(layer: L.Path): void {
-  // highlight semplice: aumenta weight e opacity
+  
   layer.setStyle({ weight: 7, opacity: 1,  dashArray: '4 12' } as any);
 }
 
@@ -837,8 +1022,25 @@ private restoreLineStyle(layer: L.Path | null): void {
   // ripristino in modo deterministico usando le properties della feature (come nello style callback)
   const props = (layer as any)?.feature?.properties ?? {};
   const color = props?.color ?? '#1E88E5';
-  layer.setStyle({ color, weight: 7, opacity: 0.9, dashArray: null, } as any);
+  layer.setStyle({ color, weight: 5, opacity: 0.9, dashArray: null, } as any);
 }
 
+enterLineEditMode(): void {
+  if (!this.selectedLineLayer) {
+    alert('Seleziona prima una linea sulla mappa.');
+    return;
+  }
+  this.editorMode = 'line-edit';
+  this.lineEditGroup.clearLayers();
+  this.lineEditGroup.addLayer(this.selectedLineLayer);
+
+  this.syncDrawToolsWithUi();
+}
+
+exitLineEditMode(): void {
+  this.editorMode = 'line-create';
+  this.lineEditGroup.clearLayers();
+  this.syncDrawToolsWithUi();
+}
 
 }
