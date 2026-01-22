@@ -1,0 +1,17 @@
+<h2 mat-dialog-title>{{ data.title || 'Uscire dalla modifica?' }}</h2>
+
+<div mat-dialog-content>
+  <p>{{ data.message || 'Hai modifiche non salvate. Cosa vuoi fare?' }}</p>
+</div>
+
+<div mat-dialog-actions align="end">
+ 
+
+    <button mat-raised-button color="primary" (click)="saveAndExit()">
+    Salva ed esci
+  </button>
+  <button mat-raised-button color="primary" (click)="discardAndExit()">
+    Esci senza salvare
+  </button>
+  <button mat-raised-button color="primary" (click)="cancel()">Annulla</button>
+</div>

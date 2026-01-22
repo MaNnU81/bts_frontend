@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatDividerModule } from '@angular/material/divider';
+import { MatIcon } from "@angular/material/icon";
 
 
 export type EditorMode = 'idle' | 'stop-edit' | 'line-create' | 'line-edit';
@@ -14,7 +15,7 @@ export type StopRef = { id: number; name: string; lat: number; lng: number };
 @Component({
   selector: 'app-line-editor-panel-component',
   standalone: true,
-  imports: [CommonModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatDividerModule],
+  imports: [CommonModule, FormsModule, MatButtonModule, MatFormFieldModule, MatInputModule, MatDividerModule, MatIcon],
   templateUrl: './line-editor-panel-component.html',
   styleUrl: './line-editor-panel-component.scss',
 })
@@ -51,7 +52,11 @@ export class LineEditorPanelComponent {
 @Output() lineColorChange = new EventEmitter<string>();
 
 @Output() saveDraft = new EventEmitter<void>();
+@Output() saveEditDraft = new EventEmitter<void>();
 
+@Output() restoreEdit = new EventEmitter<void>();
+@Input() pendingCount = 0;
+@Output() resetAllLines = new EventEmitter<void>();
 
 get isReadonly(): boolean {
   // se sto editando: mai readonly

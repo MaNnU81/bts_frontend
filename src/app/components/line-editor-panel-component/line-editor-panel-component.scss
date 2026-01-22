@@ -54,14 +54,36 @@
 }
 
 .selected__label {
-  min-width: 0;
+   min-width: 0;
+  flex: 1;  
 }
 
 .selected__actions {
   display: flex;
-  gap: 6px;
-  flex-wrap: wrap;
-  min-width: 0;
+  gap: 2px;             // 👈 più compatte
+  flex-wrap: nowrap;
+  align-items: center;
+
+}
+
+.selected__actions button.mat-button {
+  min-width: unset;     
+  padding: 0;           
+}
+.line-stop-action {
+  
+  color: #060606; 
+  font-size: 20px;      
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  opacity: 0.85;
+}
+.selected__actions button:hover .line-stop-action {
+  opacity: 1;
 }
 
 .empty {

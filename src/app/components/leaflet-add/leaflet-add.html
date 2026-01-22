@@ -63,14 +63,32 @@
 
       @if (openPanel === 'line') {
       <div class="dock__content">
-        <app-line-editor-panel-component [hasSelectedLine]="selectedLineLayer  !== null" [mode]="editorMode === 'line-edit' ? 'line-edit' : 'line-create'" [lineNumber]="lineNumber" [lineDirection]="lineDirection"
-          [lineRoute]="lineRoute" (lineNumberChange)="lineNumber = $event"
-          (lineDirectionChange)="lineDirection = $event" (lineRouteChange)="lineRoute = $event" [search]="lineSearch"
-          [results]="lineSearchResults" [selectedStops]="lineSelectedStops" (searchChange)="lineSearch = $event"
-          (addStop)="addStopToLineById($event)" (removeAt)="removeStopFromLine($event)" (moveUp)="moveStopUp($event)"
-          (moveDown)="moveStopDown($event)" (enterEdit)="enterLineEditMode()" (exitEdit)="exitLineEditMode()"[lineColor]="lineColor"
-(lineColorChange)="lineColor = $event; refreshLineDraftPolyline()"
-(saveDraft)="saveLineDraft()">
+        <app-line-editor-panel-component 
+        [hasSelectedLine]="selectedLineLayer  !== null" 
+        [mode]="editorMode === 'line-edit' ? 'line-edit' : 'line-create'" 
+        [lineNumber]="lineNumber" 
+        [lineDirection]="lineDirection"
+        [lineRoute]="lineRoute" 
+        (lineNumberChange)="lineNumber = $event"
+        (lineDirectionChange)="lineDirection = $event" 
+        (lineRouteChange)="lineRoute = $event" 
+        [search]="lineSearch"
+        [results]="lineSearchResults" 
+        [selectedStops]="lineSelectedStops" 
+        (searchChange)="lineSearch = $event"
+        (addStop)="addStopToLineById($event)"
+        (removeAt)="removeStopFromLine($event)" 
+        (moveUp)="moveStopUp($event)"
+        (moveDown)="moveStopDown($event)" 
+        (enterEdit)="enterLineEditMode()" 
+        (exitEdit)="onExitLineEditRequested()"
+        [lineColor]="lineColor"
+        (lineColorChange)="onLineColorChanged($event)"
+        (saveDraft)="saveLineDraft()" 
+        (saveEditDraft)="saveEditedLineToDraft()"
+        (restoreEdit)="restoreLineEditBaseline()"
+        [pendingCount]="pendingLineCount"
+        (resetAllLines)="resetAllLineDraftChanges()">
         </app-line-editor-panel-component>
       </div>
       }
