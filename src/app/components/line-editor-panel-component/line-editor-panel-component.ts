@@ -58,6 +58,15 @@ export class LineEditorPanelComponent {
 @Input() pendingCount = 0;
 @Output() resetAllLines = new EventEmitter<void>();
 
+@Input() createOpen = false;
+@Output() beginCreate = new EventEmitter<void>();
+
+
+
+@Input() canSaveDraft = false;
+
+
+
 get isReadonly(): boolean {
   // se sto editando: mai readonly
   if (this.mode === 'line-edit') return false;

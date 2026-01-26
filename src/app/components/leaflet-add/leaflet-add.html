@@ -88,7 +88,11 @@
         (saveEditDraft)="saveEditedLineToDraft()"
         (restoreEdit)="restoreLineEditBaseline()"
         [pendingCount]="pendingLineCount"
-        (resetAllLines)="resetAllLineDraftChanges()">
+        (resetAllLines)="resetAllLineDraftChanges()"
+        [createOpen]="lineCreateOpen"
+        (beginCreate)="beginLineCreate()"
+        [canSaveDraft]="canSaveLineDraft">
+        
         </app-line-editor-panel-component>
       </div>
       }

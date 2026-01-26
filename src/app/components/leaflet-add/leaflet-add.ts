@@ -2,7 +2,7 @@ import { AfterViewInit, Component, OnDestroy } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { forkJoin, Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
-import { LeafletService } from '../../services/leaflet-service';
+import { LeafletService } from '../../services/leaflet/leaflet-service';
 import { StopEditorPanelComponent } from '../stop-editor-panel-component/stop-editor-panel-component';
 
 import * as L from 'leaflet';
@@ -15,8 +15,22 @@ import { LineEditorPanelComponent } from '../line-editor-panel-component/line-ed
 import { MatDialog } from '@angular/material/dialog';
 import {
   ConfirmExitLineEditDialogComponent,
-  ExitLineEditChoice
+  ExitLineEditChoice,
 } from '../confirm-exit-line-edit-dialog-component/confirm-exit-line-edit-dialog-component';
+
+import { EditSession } from '../../services/leaflet/edit-session';
+
+type LineEditMeta = {
+  number: number | null;
+  direction: string;
+  route: string;
+  color: string;
+};
+
+type LineEditState = {
+  meta: LineEditMeta;
+  latlngs: L.LatLng[];
+};
 
 type StopEditorMode = 'create' | 'edit';
 
@@ -81,24 +95,24 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
   lineSelectedStops: StopRef[] = [];
   lineSearch = '';
   private lineDraftPolyline?: L.Polyline; //polyline bozza
-  
+
   private stopsGeoLayer?: L.GeoJSON;
   private linesGeoLayer?: L.GeoJSON;
 
   private stopsGroup!: L.FeatureGroup;
   private linesGroup!: L.FeatureGroup;
   private lineHintPopup?: L.Popup;
+  lineCreateOpen = false;
 
-  private lineEditTargetLayer: L.Path | null = null;     // layer "view" originale (DB o draft)
+  private lineEditTargetLayer: L.Path | null = null; // layer "view" originale (DB o draft)
 
-  private lineEditCommittedLatLngs: L.LatLng[] | null = null;
-  private lineEditCommittedMeta: {
-    number: number | null;
-    direction: string;
-    route: string;
-    color: string;
-  } | null = null;
-  
+ 
+
+
+  private lineEditSession = new EditSession<LineEditState>(
+    (a, b) => this.equalsLineEditState(a, b),
+    (v) => this.cloneLineEditState(v),
+  );
 
   showFetchedStops = true;
   showFetchedLines = true;
@@ -124,13 +138,27 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
   lineColor = '#FF9800';
 
-  private lineEditBaselineLatLngs: L.LatLng[] | null = null;
-  private lineEditBaselineMeta: {
-    number: number | null;
-    direction: string;
-    route: string;
-    color: string;
-  } | null = null;
+  //tentativo di refactoring
+
+  // private lineEditBaselineLatLngs: L.LatLng[] | null = null;
+  // private lineEditBaselineMeta: {
+  //   number: number | null;
+  //   direction: string;
+  //   route: string;
+  //   color: string;
+  // } | null = null;
+  //  private lineEditCommittedLatLngs: L.LatLng[] | null = null;
+  //   private lineEditCommittedMeta: {
+  //   number: number | null;
+  //   direction: string;
+  //   route: string;
+  //   color: string;
+  // } | null = null;
+
+
+
+
+
 
   private lineUpdatesDraft = new Map<
     number,
@@ -423,15 +451,15 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
   private handleLineEdited(event: any): void {
     event.layers.eachLayer((layer: any) => {
-    if (layer && typeof layer.redraw === 'function') {
-      layer.redraw(); // forzo redraw SVG
-    }
-  });
+      if (layer && typeof layer.redraw === 'function') {
+        layer.redraw(); // forzo redraw SVG
+      }
+    });
 
-  // riallinea stile selezionato (se vuoi)
-  if (this.selectedLineLayer) {
-    this.applySelectedLineStyle(this.selectedLineLayer);
-  }
+    // riallinea stile selezionato (se vuoi)
+    if (this.selectedLineLayer) {
+      this.applySelectedLineStyle(this.selectedLineLayer);
+    }
   }
 
   private handleLineDeleted(event: any): void {
@@ -652,31 +680,73 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
   }
 
   private createWorkingCloneFromTarget(target: L.Path): L.Polyline | null {
-  // target deve essere una polyline (le tue linee lo sono)
-  const asAny: any = target as any;
-  if (typeof asAny.getLatLngs !== 'function') return null;
+    // target deve essere una polyline (le tue linee lo sono)
+    const asAny: any = target as any;
+    if (typeof asAny.getLatLngs !== 'function') return null;
 
-  const latlngs = asAny.getLatLngs() as any[];
+    const latlngs = asAny.getLatLngs() as any[];
 
-  // stile: usa il colore corrente in UI (già caricato da selectLineLayer)
-  const clone = L.polyline(latlngs as any, {
-    weight: 5,
-    opacity: 0.9,
-    color: this.lineColor,
-  } as any);
+    // stile: usa il colore corrente in UI (già caricato da selectLineLayer)
+    const clone = L.polyline(
+      latlngs as any,
+      {
+        weight: 5,
+        opacity: 0.9,
+        color: this.lineColor,
+      } as any,
+    );
 
-  // copia feature/properties per continuare a usare kind / transport_line_id / ecc.
-  const props = (target as any)?.feature?.properties ?? {};
-  (clone as any).feature = {
-    type: 'Feature',
-    properties: { ...props },
-  };
+    // copia feature/properties per continuare a usare kind / transport_line_id / ecc.
+    const props = (target as any)?.feature?.properties ?? {};
+    (clone as any).feature = {
+      type: 'Feature',
+      properties: { ...props },
+    };
 
-  return clone;
+    return clone;
+  }
+
+  beginLineCreate(): void {
+  // se sei in edit, non permettere di iniziare creazione
+  if (this.editorMode === 'line-edit') return;
+
+  this.lineCreateOpen = true;
+
+  // togli selezione linea (sblocca readonly)
+  this.clearLineSelection();
+
+  // reset metadati (nuova linea)
+  this.lineNumber = null;
+  this.lineDirection = '';
+  this.lineRoute = '';
+  this.lineColor = '#FF9800';
+
+  // reset stop + ricerca
+  this.lineSelectedStops = [];
+  this.lineSearch = '';
+
+  // rimuovi eventuale preview polyline (se esiste)
+  if (this.lineDraftPolyline) {
+    this.linesGroup.removeLayer(this.lineDraftPolyline);
+    this.lineDraftPolyline = undefined;
+  }
+
+  // assicurati di essere in create mode
+  this.editorMode = 'line-create';
 }
 
 
   saveLineDraft(): void {
+  const numberOk = Number.isFinite(this.lineNumber as any);
+  const directionOk = (this.lineDirection ?? '').trim().length > 0;
+  const routeOk = (this.lineRoute ?? '').trim().length > 0;
+
+  if (!numberOk || !directionOk || !routeOk) {
+    alert('Compila i metadati della linea (Numero, Direzione, Route) prima di salvare.');
+    return;
+  }
+
+
     // 1) deve esistere una bozza (almeno 2 stop)
     if (this.lineSelectedStops.length < 2) {
       alert('Servono almeno 2 fermate per creare una linea.');
@@ -712,6 +782,7 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
     // 5) dopo salvataggio in draft, selezionala (così puoi premere subito Modifica)
     this.selectLineLayer(this.lineDraftPolyline as any);
+    this.lineCreateOpen = false;
 
     alert('Linea salvata in draft (solo locale).');
   }
@@ -726,69 +797,133 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     return found;
   }
 
-saveEditedLineToDraft(): void {
-  if (this.editorMode !== 'line-edit') return;
+  saveEditedLineToDraft(): void {
+    if (this.editorMode !== 'line-edit') return;
 
-  const working = this.getEditedPolylineFromEditGroup();
-  if (!working) {
-    alert('Nessuna linea in modifica.');
-    return;
+    const working = this.getEditedPolylineFromEditGroup();
+    if (!working) {
+      alert('Nessuna linea in modifica.');
+      return;
+    }
+
+    const target = this.lineEditTargetLayer;
+    if (!target) {
+      alert('Target linea non trovato.');
+      return;
+    }
+
+    // 1) latlng aggiornati (dalla clone)
+    const latlngs = working.getLatLngs() as any[];
+
+    // 2) capisco se target era draft o DB
+    const tProps = (target as any)?.feature?.properties ?? {};
+    const isDraft = tProps?.kind === 'line-draft';
+    const id = tProps?.transport_line_id != null ? Number(tProps.transport_line_id) : null;
+
+    // === CASO DRAFT (nuova linea) ===
+    if (isDraft && this.lineDraftPolyline) {
+      this.lineDraftPolyline.setLatLngs(latlngs);
+
+      (this.lineDraftPolyline as any).feature = (this.lineDraftPolyline as any).feature ?? {
+        type: 'Feature',
+        properties: {},
+      };
+
+      const p = (this.lineDraftPolyline as any).feature.properties ?? {};
+      p.kind = 'line-draft';
+      p.color = this.lineColor;
+      p.number = this.lineNumber;
+      p.direction = this.lineDirection;
+      p.route = this.lineRoute;
+      (this.lineDraftPolyline as any).feature.properties = p;
+
+      this.lineDraftPolyline.setStyle({ color: this.lineColor, opacity: 0.9, weight: 5 } as any);
+      const curr = this.getCurrentLineEditState();
+      if (curr) this.lineEditSession.commit(curr);
+
+      alert('Modifiche salvate nella linea draft.');
+      return;
+    }
+
+    // === CASO DB ===
+    if (!id) {
+      alert('Linea selezionata non ha transport_line_id (non posso salvarla come update).');
+      return;
+    }
+
+    this.lineUpdatesDraft.set(id, {
+      id,
+      number: this.lineNumber,
+      direction: this.lineDirection,
+      route: this.lineRoute,
+      color: this.lineColor,
+      latlngs,
+    });
+    const curr = this.getCurrentLineEditState();
+    if (curr) this.lineEditSession.commit(curr);
+    alert('Modifiche salvate come draft update (linea DB).');
   }
 
-  const target = this.lineEditTargetLayer;
-  if (!target) {
-    alert('Target linea non trovato.');
-    return;
-  }
+  private getCurrentLineEditState(): LineEditState | null {
+    if (this.editorMode !== 'line-edit') return null;
 
-  // 1) latlng aggiornati (dalla clone)
-  const latlngs = working.getLatLngs() as any[];
+    const edited = this.getEditedPolylineFromEditGroup();
+    if (!edited) return null;
 
-  // 2) capisco se target era draft o DB
-  const tProps = (target as any)?.feature?.properties ?? {};
-  const isDraft = tProps?.kind === 'line-draft';
-  const id = tProps?.transport_line_id != null ? Number(tProps.transport_line_id) : null;
+    const latlngs = (edited.getLatLngs() ?? []) as L.LatLng[];
 
-  // === CASO DRAFT (nuova linea) ===
-  if (isDraft && this.lineDraftPolyline) {
-    this.lineDraftPolyline.setLatLngs(latlngs);
-
-    (this.lineDraftPolyline as any).feature = (this.lineDraftPolyline as any).feature ?? {
-      type: 'Feature',
-      properties: {},
+    return {
+      meta: {
+        number: this.lineNumber,
+        direction: this.lineDirection,
+        route: this.lineRoute,
+        color: this.lineColor,
+      },
+      latlngs,
     };
-
-    const p = (this.lineDraftPolyline as any).feature.properties ?? {};
-    p.kind = 'line-draft';
-    p.color = this.lineColor;
-    p.number = this.lineNumber;
-    p.direction = this.lineDirection;
-    p.route = this.lineRoute;
-    (this.lineDraftPolyline as any).feature.properties = p;
-
-    this.lineDraftPolyline.setStyle({ color: this.lineColor, opacity: 0.9, weight: 5 } as any);
-    this.markLineEditCommittedFromCurrent();
-    alert('Modifiche salvate nella linea draft.');
-    return;
   }
 
-  // === CASO DB ===
-  if (!id) {
-    alert('Linea selezionata non ha transport_line_id (non posso salvarla come update).');
-    return;
+
+  private applyLineEditState(state: LineEditState): void {
+    this.lineNumber = state.meta.number;
+    this.lineDirection = state.meta.direction;
+    this.lineRoute = state.meta.route;
+    this.lineColor = state.meta.color;
+  
+    const edited = this.getEditedPolylineFromEditGroup();
+    if (edited) {
+      edited.setLatLngs(state.latlngs);
+      edited.setStyle?.({ color: this.lineColor, opacity: 0.9, weight: 5 } as any);
+    }
   }
 
-  this.lineUpdatesDraft.set(id, {
-    id,
-    number: this.lineNumber,
-    direction: this.lineDirection,
-    route: this.lineRoute,
-    color: this.lineColor,
-    latlngs,
-  });
-  this.markLineEditCommittedFromCurrent();
-  alert('Modifiche salvate come draft update (linea DB).');
+  private cloneLineEditState(v: LineEditState): LineEditState {
+    return {
+      meta: { ...v.meta },
+      latlngs: v.latlngs.map(p => L.latLng(p.lat, p.lng)),
+    };
+  }
+
+  private equalsLineEditState(a: LineEditState, b: LineEditState): boolean {
+  if (a.meta.number !== b.meta.number) return false;
+  if (a.meta.direction !== b.meta.direction) return false;
+  if (a.meta.route !== b.meta.route) return false;
+  if (a.meta.color !== b.meta.color) return false;
+
+  if (a.latlngs.length !== b.latlngs.length) return false;
+
+  const eps = 1e-10;
+  for (let i = 0; i < a.latlngs.length; i++) {
+    const p = a.latlngs[i];
+    const q = b.latlngs[i];
+    if (!q) return false;
+    if (Math.abs(p.lat - q.lat) > eps) return false;
+    if (Math.abs(p.lng - q.lng) > eps) return false;
+  }
+  return true;
 }
+
+
 
 
   saveAllToDb(): void {
@@ -988,53 +1123,53 @@ saveEditedLineToDraft(): void {
     this.editorState = null;
   }
 
- resetAllLineDraftChanges(): void {
-  // 1) se sono in edit, esco (rimette la linea nel linesGroup e pulisce baseline)
-  if (this.editorMode === 'line-edit') {
-    this.exitLineEditMode();
+  resetAllLineDraftChanges(): void {
+    // 1) se sono in edit, esco (rimette la linea nel linesGroup e pulisce baseline)
+    if (this.editorMode === 'line-edit') {
+      this.exitLineEditMode();
+    }
+
+    // 2) tolgo stile selezione dalla linea attuale (se c'era)
+    this.restoreLineStyle(this.selectedLineLayer);
+    this.selectedLineLayer = null;
+
+    // 3) cancello tutti i draft update linee DB
+    this.lineUpdatesDraft.clear();
+
+    // 4) ripristino subito lo stile baseline di TUTTE le linee visibili in mappa
+    this.linesGroup.eachLayer((l: any) => {
+      if (!l || typeof l.setStyle !== 'function') return;
+      this.restoreLineStyle(l as L.Path); // ora non trova draft -> baseline
+    });
+
+    // 5) rimuovo la bozza polyline (nuova linea)
+    if (this.lineDraftPolyline) {
+      this.linesGroup.removeLayer(this.lineDraftPolyline);
+      this.lineDraftPolyline = undefined;
+    }
+
+    // 6) reset sequenza stop + ricerca
+    this.lineSelectedStops = [];
+    this.lineSearch = '';
+
+    // 7) reset metadati UI (nuova linea)
+    this.lineNumber = null;
+    this.lineDirection = '';
+    this.lineRoute = '';
+    this.lineColor = '#FF9800';
+
+    // 8) torno in modalità create (se il pannello line è aperto)
+    if (this.openPanel === 'line') {
+      this.editorMode = 'line-create';
+    } else {
+      this.editorMode = 'idle';
+    }
+
+    // 9) riallineo tool draw con UI
+    this.syncDrawToolsWithUi();
+
+    alert('Modifiche linee (draft) resettate.');
   }
-
-  // 2) tolgo stile selezione dalla linea attuale (se c'era)
-  this.restoreLineStyle(this.selectedLineLayer);
-  this.selectedLineLayer = null;
-
-  // 3) cancello tutti i draft update linee DB
-  this.lineUpdatesDraft.clear();
-
-  // 4) ripristino subito lo stile baseline di TUTTE le linee visibili in mappa
-  this.linesGroup.eachLayer((l: any) => {
-    if (!l || typeof l.setStyle !== 'function') return;
-    this.restoreLineStyle(l as L.Path); // ora non trova draft -> baseline
-  });
-
-  // 5) rimuovo la bozza polyline (nuova linea)
-  if (this.lineDraftPolyline) {
-    this.linesGroup.removeLayer(this.lineDraftPolyline);
-    this.lineDraftPolyline = undefined;
-  }
-
-  // 6) reset sequenza stop + ricerca
-  this.lineSelectedStops = [];
-  this.lineSearch = '';
-
-  // 7) reset metadati UI (nuova linea)
-  this.lineNumber = null;
-  this.lineDirection = '';
-  this.lineRoute = '';
-  this.lineColor = '#FF9800';
-
-  // 8) torno in modalità create (se il pannello line è aperto)
-  if (this.openPanel === 'line') {
-    this.editorMode = 'line-create';
-  } else {
-    this.editorMode = 'idle';
-  }
-
-  // 9) riallineo tool draw con UI
-  this.syncDrawToolsWithUi();
-
-  alert('Modifiche linee (draft) resettate.');
-}
 
   //panel
 
@@ -1085,7 +1220,7 @@ saveEditedLineToDraft(): void {
       (this.lineDraftPolyline as any).feature = {
         type: 'Feature',
         properties: {
-          kind: 'line-draft',
+          kind: 'line-draft-preview',
           color: this.lineColor,
           number: this.lineNumber,
           direction: this.lineDirection,
@@ -1165,35 +1300,35 @@ saveEditedLineToDraft(): void {
 
   //linee cliccabili
 
-private onLineLayerClicked(layer: L.Path, e?: L.LeafletMouseEvent): void {
-  if (this.editorMode === 'line-edit') {
-    const latlng = e?.latlng ?? this.map.getCenter();
+  private onLineLayerClicked(layer: L.Path, e?: L.LeafletMouseEvent): void {
+    if (this.editorMode === 'line-edit') {
+      const latlng = e?.latlng ?? this.map.getCenter();
 
-    // chiudi eventuale popup precedente
-    this.lineHintPopup?.remove();
-
-    this.lineHintPopup = L.popup({
-      closeButton: false,
-      autoClose: true,
-      closeOnClick: false,
-      className: 'map-hint-popup',
-      offset: L.point(0, -8),
-    })
-      .setLatLng(latlng)
-      .setContent('Sei in modifica: premi "Esci da Modifica" per cambiare linea.')
-      .openOn(this.map);
-
-    // auto-chiusura
-    window.setTimeout(() => {
+      // chiudi eventuale popup precedente
       this.lineHintPopup?.remove();
-      this.lineHintPopup = undefined;
-    }, 1400);
 
-    return;
+      this.lineHintPopup = L.popup({
+        closeButton: false,
+        autoClose: true,
+        closeOnClick: false,
+        className: 'map-hint-popup',
+        offset: L.point(0, -8),
+      })
+        .setLatLng(latlng)
+        .setContent('Sei in modifica: premi "Esci da Modifica" per cambiare linea.')
+        .openOn(this.map);
+
+      // auto-chiusura
+      window.setTimeout(() => {
+        this.lineHintPopup?.remove();
+        this.lineHintPopup = undefined;
+      }, 1400);
+
+      return;
+    }
+
+    this.selectLineLayer(layer);
   }
-
-  this.selectLineLayer(layer);
-}
 
   private selectLineLayer(layer: L.Path): void {
     if (this.selectedLineLayer === layer) {
@@ -1260,147 +1395,137 @@ private onLineLayerClicked(layer: L.Path, e?: L.LeafletMouseEvent): void {
   }
 
   enterLineEditMode(): void {
-  if (!this.selectedLineLayer) {
-    alert('Seleziona prima una linea sulla mappa.');
-    return;
-  }
+    if (!this.selectedLineLayer) {
+      alert('Seleziona prima una linea sulla mappa.');
+      return;
+    }
 
-  // se già in edit, evita casini
-  if (this.editorMode === 'line-edit') return;
+    const props = (this.selectedLineLayer as any)?.feature?.properties ?? {};
+    const isDbLine = props.transport_line_id != null;
+    const isSavedDraft = props.kind === 'line-draft';
 
-  this.editorMode = 'line-edit';
+    if (!isDbLine && !isSavedDraft) {
+      alert('Prima salva la linea in draft, poi potrai modificarla.');
+      return;
+    }
 
-  // target = quello che l'utente aveva selezionato in view
-  this.lineEditTargetLayer = this.selectedLineLayer;
+    // se già in edit, evita casini
+    if (this.editorMode === 'line-edit') return;
 
-  // tolgo stile selezione (dash) prima dell'edit
-  this.restoreLineStyle(this.lineEditTargetLayer);
+    this.editorMode = 'line-edit';
 
-  // sposto fuori il target dalla view (evita doppioni visivi)
-  this.linesGroup.removeLayer(this.lineEditTargetLayer);
+    // target = quello che l'utente aveva selezionato in view
+    this.lineEditTargetLayer = this.selectedLineLayer;
 
-  // preparo clone
-  this.lineEditGroup.clearLayers();
-  const clone = this.createWorkingCloneFromTarget(this.lineEditTargetLayer);
-
-  if (!clone) {
-    // fallback: rimetti target e torna create
-    this.linesGroup.addLayer(this.lineEditTargetLayer);
-    this.lineEditTargetLayer = null;
-    this.editorMode = 'line-create';
-    this.syncDrawToolsWithUi();
-    alert('Impossibile entrare in modifica: la linea non è una polyline editabile.');
-    return;
-  }
-
-  
-  this.lineEditGroup.addLayer(clone);
-
-  // in edit, la selected deve essere la clone (così i tuoi handler lavorano sul layer giusto)
-  this.selectedLineLayer = clone;
-
-  // ✅ baseline meta (come prima)
-  this.lineEditBaselineMeta = {
-    number: this.lineNumber,
-    direction: this.lineDirection,
-    route: this.lineRoute,
-    color: this.lineColor,
-  };
-
-    // ✅ baseline shape (dalla clone)
-  const latlngs = (clone.getLatLngs() ?? []) as L.LatLng[];
-  this.lineEditBaselineLatLngs = latlngs.map((p) => L.latLng(p.lat, p.lng));
-
-  // committed iniziale = baseline d’ingresso
-this.lineEditCommittedMeta = this.lineEditBaselineMeta
-  ? { ...this.lineEditBaselineMeta }
-  : null;
-
-this.lineEditCommittedLatLngs = this.lineEditBaselineLatLngs
-  ? this.lineEditBaselineLatLngs.map(p => L.latLng(p.lat, p.lng))
-  : null;
-
-
-
-  // tools draw (edit toolbar)
-  this.syncDrawToolsWithUi();
-}
-
-exitLineEditMode(): void {
-  // distruggo la clone
-  this.lineEditGroup.clearLayers();
- 
-
-  // rimetto il target in view
-  if (this.lineEditTargetLayer) {
-    this.linesGroup.addLayer(this.lineEditTargetLayer);
-
-    // riallineo stile del target (baseline o draft update)
+    // tolgo stile selezione (dash) prima dell'edit
     this.restoreLineStyle(this.lineEditTargetLayer);
 
-    // selected torna al target (così puoi riselezionare/vedere meta)
-    this.selectedLineLayer = this.lineEditTargetLayer;
+    // sposto fuori il target dalla view (evita doppioni visivi)
+    this.linesGroup.removeLayer(this.lineEditTargetLayer);
 
-    this.lineEditTargetLayer = null;
-  } else {
-    this.selectedLineLayer = null;
+    // preparo clone
+    this.lineEditGroup.clearLayers();
+    const clone = this.createWorkingCloneFromTarget(this.lineEditTargetLayer);
+
+    if (!clone) {
+      // fallback: rimetti target e torna create
+      this.linesGroup.addLayer(this.lineEditTargetLayer);
+      this.lineEditTargetLayer = null;
+      this.editorMode = 'line-create';
+      this.syncDrawToolsWithUi();
+      alert('Impossibile entrare in modifica: la linea non è una polyline editabile.');
+      return;
+    }
+
+    this.lineEditGroup.addLayer(clone);
+
+    // in edit, la selected deve essere la clone (così i tuoi handler lavorano sul layer giusto)
+    this.selectedLineLayer = clone;
+
+
+    this.syncDrawToolsWithUi();
+
+    const curr = this.getCurrentLineEditState();
+    if (curr) {
+      this.lineEditSession.start(curr);
+    }
   }
 
-  this.editorMode = 'line-create';
-  this.lineEditBaselineLatLngs = null;
-  this.lineEditBaselineMeta = null;
+  exitLineEditMode(): void {
+    // distruggo la clone
+    this.lineEditGroup.clearLayers();
 
-  this.lineEditCommittedLatLngs = null;
-  this.lineEditCommittedMeta = null;
+    // rimetto il target in view
+    if (this.lineEditTargetLayer) {
+      this.linesGroup.addLayer(this.lineEditTargetLayer);
+
+      // riallineo stile del target (baseline o draft update)
+      this.restoreLineStyle(this.lineEditTargetLayer);
+
+      // selected torna al target (così puoi riselezionare/vedere meta)
+      this.selectedLineLayer = this.lineEditTargetLayer;
+
+      this.lineEditTargetLayer = null;
+    } else {
+      this.selectedLineLayer = null;
+    }
 
 
-  this.syncDrawToolsWithUi();
-}
 
+    this.lineEditSession.stop();
 
-private restoreLineEditCommitted(): void {
+    this.editorMode = 'line-create';
+    this.syncDrawToolsWithUi();
+  }
+
+  // private restoreLineEditCommitted(): void {
+  //   if (this.editorMode !== 'line-edit') return;
+
+  //   const edited = this.getEditedPolylineFromEditGroup();
+  //   if (!edited) return;
+
+  //   if (this.lineEditCommittedLatLngs && this.lineEditCommittedLatLngs.length >= 2) {
+  //     edited.setLatLngs(this.lineEditCommittedLatLngs);
+  //   }
+
+  //   if (this.lineEditCommittedMeta) {
+  //     this.lineNumber = this.lineEditCommittedMeta.number;
+  //     this.lineDirection = this.lineEditCommittedMeta.direction;
+  //     this.lineRoute = this.lineEditCommittedMeta.route;
+  //     this.lineColor = this.lineEditCommittedMeta.color;
+  //   }
+
+  //   edited.setStyle?.({ color: this.lineColor } as any);
+  // }
+
+  // restoreLineEditBaseline(): void {
+  //   if (this.editorMode !== 'line-edit') return;
+
+  //   const working = this.getEditedPolylineFromEditGroup();
+  //   if (!working) return;
+
+  //   // 1) ripristina shape
+  //   if (this.lineEditBaselineLatLngs && this.lineEditBaselineLatLngs.length >= 2) {
+  //     working.setLatLngs(this.lineEditBaselineLatLngs);
+  //   }
+
+  //   // 2) ripristina meta UI
+  //   if (this.lineEditBaselineMeta) {
+  //     this.lineNumber = this.lineEditBaselineMeta.number;
+  //     this.lineDirection = this.lineEditBaselineMeta.direction;
+  //     this.lineRoute = this.lineEditBaselineMeta.route;
+  //     this.lineColor = this.lineEditBaselineMeta.color;
+  //   }
+
+  //   // 3) applica subito colore sulla clone
+  //   working.setStyle?.({ color: this.lineColor } as any);
+  // }
+
+  restoreLineEditBaseline(): void {
   if (this.editorMode !== 'line-edit') return;
-
-  const edited = this.getEditedPolylineFromEditGroup();
-  if (!edited) return;
-
-  if (this.lineEditCommittedLatLngs && this.lineEditCommittedLatLngs.length >= 2) {
-    edited.setLatLngs(this.lineEditCommittedLatLngs);
+  const restored = this.lineEditSession.restoreBaseline();
+  this.applyLineEditState(restored);
   }
-
-  if (this.lineEditCommittedMeta) {
-    this.lineNumber = this.lineEditCommittedMeta.number;
-    this.lineDirection = this.lineEditCommittedMeta.direction;
-    this.lineRoute = this.lineEditCommittedMeta.route;
-    this.lineColor = this.lineEditCommittedMeta.color;
-  }
-
-  edited.setStyle?.({ color: this.lineColor } as any);
-}
-
- restoreLineEditBaseline(): void {
-  if (this.editorMode !== 'line-edit') return;
-
-  const working = this.getEditedPolylineFromEditGroup();
-  if (!working) return;
-
-  // 1) ripristina shape
-  if (this.lineEditBaselineLatLngs && this.lineEditBaselineLatLngs.length >= 2) {
-    working.setLatLngs(this.lineEditBaselineLatLngs);
-  }
-
-  // 2) ripristina meta UI
-  if (this.lineEditBaselineMeta) {
-    this.lineNumber = this.lineEditBaselineMeta.number;
-    this.lineDirection = this.lineEditBaselineMeta.direction;
-    this.lineRoute = this.lineEditBaselineMeta.route;
-    this.lineColor = this.lineEditBaselineMeta.color;
-  }
-
-  // 3) applica subito colore sulla clone
-  working.setStyle?.({ color: this.lineColor } as any);
-}
-
 
   onLineColorChanged(color: string): void {
     this.lineColor = color;
@@ -1417,82 +1542,102 @@ private restoreLineEditCommitted(): void {
     }
   }
 
-private hasUnsavedLineEditChanges(): boolean {
+  // private hasUnsavedLineEditChanges(): boolean {
+  //   if (this.editorMode !== 'line-edit') return false;
+
+  //   const edited = this.getEditedPolylineFromEditGroup();
+  //   if (!edited) return false;
+
+  //   const committedMeta = this.lineEditCommittedMeta;
+  //   const metaDirty =
+  //     !committedMeta ||
+  //     committedMeta.number !== this.lineNumber ||
+  //     committedMeta.direction !== this.lineDirection ||
+  //     committedMeta.route !== this.lineRoute ||
+  //     committedMeta.color !== this.lineColor;
+
+  //   const committedLatLngs = this.lineEditCommittedLatLngs ?? [];
+  //   const currLatLngs = (edited.getLatLngs() ?? []) as L.LatLng[];
+
+  //   const shapeDirty =
+  //     committedLatLngs.length !== currLatLngs.length ||
+  //     committedLatLngs.some((p, i) => {
+  //       const c = currLatLngs[i];
+  //       if (!c) return true;
+  //       return Math.abs(p.lat - c.lat) > 1e-10 || Math.abs(p.lng - c.lng) > 1e-10;
+  //     });
+
+  //   return metaDirty || shapeDirty;
+  // }
+
+  private hasUnsavedLineEditChanges(): boolean {
   if (this.editorMode !== 'line-edit') return false;
-
-  const edited = this.getEditedPolylineFromEditGroup();
-  if (!edited) return false;
-
-  const committedMeta = this.lineEditCommittedMeta;
-  const metaDirty =
-    !committedMeta ||
-    committedMeta.number !== this.lineNumber ||
-    committedMeta.direction !== this.lineDirection ||
-    committedMeta.route !== this.lineRoute ||
-    committedMeta.color !== this.lineColor;
-
-  const committedLatLngs = this.lineEditCommittedLatLngs ?? [];
-  const currLatLngs = (edited.getLatLngs() ?? []) as L.LatLng[];
-
-  const shapeDirty =
-    committedLatLngs.length !== currLatLngs.length ||
-    committedLatLngs.some((p, i) => {
-      const c = currLatLngs[i];
-      if (!c) return true;
-      return Math.abs(p.lat - c.lat) > 1e-10 || Math.abs(p.lng - c.lng) > 1e-10;
-    });
-
-  return metaDirty || shapeDirty;
-}
-
-
-
-onExitLineEditRequested(): void {
-  // se non ci sono modifiche non salvate, esci diretto
-  if (!this.hasUnsavedLineEditChanges()) {
-    this.exitLineEditMode();
-    return;
+  const curr = this.getCurrentLineEditState();
+  if (!curr) return false;
+  return this.lineEditSession.isDirty(curr);
   }
 
-  const ref = this.dialog.open(ConfirmExitLineEditDialogComponent, {
-    width: '420px',
-    data: {
-      title: 'Uscire dalla modifica?',
-      message: 'Hai modifiche non salvate in draft. Vuoi salvarle prima di uscire?',
-    },
-    disableClose: true, // obbliga scelta esplicita
-  });
-
-  ref.afterClosed().subscribe((choice: ExitLineEditChoice | undefined) => {
-    if (!choice || choice === 'cancel') return;
-
-    if (choice === 'save_exit') {
-      this.saveEditedLineToDraft();
+  onExitLineEditRequested(): void {
+    // se non ci sono modifiche non salvate, esci diretto
+    if (!this.hasUnsavedLineEditChanges()) {
       this.exitLineEditMode();
       return;
     }
 
-    if (choice === 'discard_exit') {
-      // scarta la sessione tornando alla commited, poi esci
-      this.restoreLineEditCommitted();
-      this.exitLineEditMode();
-      return;
-    }
-  });
+    const ref = this.dialog.open(ConfirmExitLineEditDialogComponent, {
+      width: '420px',
+      data: {
+        title: 'Uscire dalla modifica?',
+        message: 'Hai modifiche non salvate in draft. Vuoi salvarle prima di uscire?',
+      },
+      disableClose: true, // obbliga scelta esplicita
+    });
+
+    ref.afterClosed().subscribe((choice: ExitLineEditChoice | undefined) => {
+      if (!choice || choice === 'cancel') return;
+
+      if (choice === 'save_exit') {
+        this.saveEditedLineToDraft();
+        this.exitLineEditMode();
+        return;
+      }
+
+      if (choice === 'discard_exit') {
+        // scarta la sessione tornando alla commited, poi esci
+        const restored = this.lineEditSession.restoreCommitted();
+        this.applyLineEditState(restored);
+        this.exitLineEditMode();
+
+        
+        return;
+      }
+    });
+  }
+
+  get canSaveLineDraft(): boolean {
+  // metadati obbligatori
+  const numberOk = this.lineNumber != null && Number.isFinite(this.lineNumber) && this.lineNumber > 0;
+  const directionOk = (this.lineDirection ?? '').trim().length > 0;
+  const routeOk = (this.lineRoute ?? '').trim().length > 0;
+
+  // almeno 2 stop selezionate
+  const stopsOk = this.lineSelectedStops.length >= 2;
+
+  return numberOk && directionOk && routeOk && stopsOk;
 }
 
-private markLineEditCommittedFromCurrent(): void {
-  const edited = this.getEditedPolylineFromEditGroup();
-  if (!edited) return;
+  // private markLineEditCommittedFromCurrent(): void {
+  //   const edited = this.getEditedPolylineFromEditGroup();
+  //   if (!edited) return;
 
-  this.lineEditCommittedMeta = {
-    number: this.lineNumber,
-    direction: this.lineDirection,
-    route: this.lineRoute,
-    color: this.lineColor,
-  };
+  //   this.lineEditCommittedMeta = {
+  //     number: this.lineNumber,
+  //     direction: this.lineDirection,
+  //     route: this.lineRoute,
+  //     color: this.lineColor,
+  //   };
 
-  const curr = (edited.getLatLngs() ?? []) as L.LatLng[];
-  this.lineEditCommittedLatLngs = curr.map(p => L.latLng(p.lat, p.lng));
-}
+  //   const curr = (edited.getLatLngs() ?? []) as L.LatLng[];
+  //   this.lineEditCommittedLatLngs = curr.map((p) => L.latLng(p.lat, p.lng));
+  // }
 }
