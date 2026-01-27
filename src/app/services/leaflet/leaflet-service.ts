@@ -17,6 +17,8 @@ export class LeafletService {
   private linesGroup?: L.FeatureGroup;
 
   private deletedGhostGroup?: L.FeatureGroup;
+  private deletedLinesGhostGroup?: L.FeatureGroup;
+  
 
   private iconUpdated?: L.Icon;
   private iconDeleted?: L.Icon;
@@ -47,7 +49,10 @@ export class LeafletService {
 
     //icone colorate in base allo stato
     this.deletedGhostGroup = new L.FeatureGroup();
+    this.deletedLinesGhostGroup = new L.FeatureGroup();
+
     this.map.addLayer(this.deletedGhostGroup);
+    this.map.addLayer(this.deletedLinesGhostGroup);
 
     this.map.addLayer(this.stopsGroup);
     this.map.addLayer(this.linesGroup);
@@ -60,6 +65,7 @@ export class LeafletService {
     this.stopsGroup = undefined;
     this.linesGroup = undefined;
     this.deletedGhostGroup = undefined;
+    this.deletedLinesGhostGroup = undefined;
 
     this.iconUpdated = undefined;
     this.iconDeleted = undefined;
@@ -211,4 +217,25 @@ export class LeafletService {
     if (!this.iconDeleted) return;
     marker.setIcon(this.iconDeleted);
   }
+
+  getDeletedLinesGhostGroup(): L.FeatureGroup {
+  if (!this.deletedLinesGhostGroup)
+    throw new Error('LeafletService: deletedLinesGhostGroup non inizializzato.');
+  return this.deletedLinesGhostGroup;
+}
+
+setLineStyleDeleted(line: L.Path): void {
+  line.setStyle({ color: '#9E9E9E', weight: 5, opacity: 1, dashArray: null } as any);
+}
+
+moveLineToDeleted(line: L.Path): void {
+  this.getLinesGroup().removeLayer(line);
+  this.getDeletedLinesGhostGroup().addLayer(line);
+  this.setLineStyleDeleted(line);
+}
+
+restoreLineFromDeleted(line: L.Path): void {
+  this.getDeletedLinesGhostGroup().removeLayer(line);
+  this.getLinesGroup().addLayer(line);
+}
 }

@@ -9,6 +9,9 @@ import { TripRun } from '../models/trip-run';
 import { TripStopLinesResponse } from '../models/trip-stop-lines';
 import { StopBoardDto } from '../models/stop-board';
 import { StopBatchRequestDto, StopBatchResponseDto } from '../models/stop-batch-dto';
+import { LineWithStopsEditorDto } from '../models/line-with-stops-editor';
+import { LineBatchRequestDto, LineBatchResponseDto } from '../models/line-batch-dto';
+
 
 @Injectable({
   providedIn: 'root',
@@ -85,6 +88,16 @@ export class DataService {
   applyStopBatch(request: StopBatchRequestDto) {
     const url = `${this.baseUrl}/batch/stops`;
     return this.http.post<StopBatchResponseDto>(url, request);
+  }
+
+  getLineWithStopsEditor(lineId: number): Observable<LineWithStopsEditorDto> {
+    const url = `${this.baseUrl}/lookup/lines/${lineId}/stops-editor`;
+    return this.http.get<LineWithStopsEditorDto>(url);  
+  }
+
+  applyLinesBatch(request: LineBatchRequestDto): Observable<LineBatchResponseDto> {
+    const url = `${this.baseUrl}/batch/lines`;
+    return this.http.post<LineBatchResponseDto>(url, request);
   }
   
 }

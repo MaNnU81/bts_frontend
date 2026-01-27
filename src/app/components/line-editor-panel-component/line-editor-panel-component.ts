@@ -65,6 +65,12 @@ export class LineEditorPanelComponent {
 
 @Input() canSaveDraft = false;
 
+@Input() isSelectedDeleted = false;
+
+@Output() deleteSelected = new EventEmitter<void>();
+@Output() restoreSelected = new EventEmitter<void>();
+@Output() saveAllDb = new EventEmitter<void>();
+
 
 
 get isReadonly(): boolean {

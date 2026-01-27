@@ -9,6 +9,13 @@
   font-size: 18px;
 }
 
+.dashboard__actions {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
 .dashboard__field {
   width: 100%;
 }

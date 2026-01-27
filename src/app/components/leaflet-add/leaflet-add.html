@@ -91,7 +91,11 @@
         (resetAllLines)="resetAllLineDraftChanges()"
         [createOpen]="lineCreateOpen"
         (beginCreate)="beginLineCreate()"
-        [canSaveDraft]="canSaveLineDraft">
+        [canSaveDraft]="canSaveLineDraft"
+        [isSelectedDeleted]="isSelectedLineDeleted"
+        (deleteSelected)="markDeleteSelectedLine()"
+        (restoreSelected)="restoreSelectedDeletedLine()"
+        (saveAllDb)="saveAllLinesToDb()">
         
         </app-line-editor-panel-component>
       </div>

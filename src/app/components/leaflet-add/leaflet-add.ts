@@ -4,6 +4,7 @@ import { forkJoin, Subscription } from 'rxjs';
 import { MatButtonModule } from '@angular/material/button';
 import { LeafletService } from '../../services/leaflet/leaflet-service';
 import { StopEditorPanelComponent } from '../stop-editor-panel-component/stop-editor-panel-component';
+import { firstValueFrom } from 'rxjs';
 
 import * as L from 'leaflet';
 import 'leaflet-draw';
@@ -19,6 +20,8 @@ import {
 } from '../confirm-exit-line-edit-dialog-component/confirm-exit-line-edit-dialog-component';
 
 import { EditSession } from '../../services/leaflet/edit-session';
+import { LineBatchRequestDto } from '../../models/line-batch-dto';
+import { N } from '@angular/cdk/keycodes';
 
 type LineEditMeta = {
   number: number | null;
@@ -87,6 +90,9 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
   private baselineStopsById = new Map<number, { name: string; lat: number; lng: number }>();
   private deletedMarkersById = new Map<number, L.Marker>();
 
+  private lineDeletedDraft = new Set<number>();              // ids linee DB marcate delete
+  private deletedLineLayersById = new Map<number, L.Path>(); // layer cache per undo
+
   private tmpCounter = 1;
 
   //search stops id e name
@@ -101,12 +107,12 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
   private stopsGroup!: L.FeatureGroup;
   private linesGroup!: L.FeatureGroup;
+  
+
   private lineHintPopup?: L.Popup;
   lineCreateOpen = false;
 
   private lineEditTargetLayer: L.Path | null = null; // layer "view" originale (DB o draft)
-
- 
 
 
   private lineEditSession = new EditSession<LineEditState>(
@@ -140,26 +146,6 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
   //tentativo di refactoring
 
-  // private lineEditBaselineLatLngs: L.LatLng[] | null = null;
-  // private lineEditBaselineMeta: {
-  //   number: number | null;
-  //   direction: string;
-  //   route: string;
-  //   color: string;
-  // } | null = null;
-  //  private lineEditCommittedLatLngs: L.LatLng[] | null = null;
-  //   private lineEditCommittedMeta: {
-  //   number: number | null;
-  //   direction: string;
-  //   route: string;
-  //   color: string;
-  // } | null = null;
-
-
-
-
-
-
   private lineUpdatesDraft = new Map<
     number,
     {
@@ -185,7 +171,8 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
   get pendingLineCount(): number {
     const draftNew = this.isDraftLineSaved() ? 1 : 0;
     const draftUpdates = this.lineUpdatesDraft.size;
-    return draftNew + draftUpdates;
+    const draftDeletes = this.lineDeletedDraft.size;
+    return draftNew + draftUpdates + draftDeletes;
   }
 
   private isDraftLineSaved(): boolean {
@@ -574,19 +561,6 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
             return { color, weight: 5, opacity: 0.9 };
           },
           onEachFeature: (feature: any, layer: any) => {
-            // const id = feature?.properties?.transport_line_id;
-            // const number = feature?.properties?.number;
-            // const direction = feature?.properties?.direction;
-
-            //tolgo il popUp alle linee per problemi con il click select (aggiungo pero info in input)
-            // if (layer.bindPopup && id != null) {
-            //   const label =
-            //     number != null
-            //       ? `line ${number}${direction ? ` (${direction})` : ''}`
-            //       : `transport_line_id: ${id}`;
-            //   layer.bindPopup(label);
-            // }
-
             layer.on('click', (e: any) => this.onLineLayerClicked(layer as L.Path, e));
           },
         });
@@ -1022,6 +996,33 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     this.editorState = null;
   }
 
+  markDeleteSelectedLine(): void {
+  if (this.editorMode === 'line-edit') return; // non in edit
+  if (!this.selectedLineLayer) return;
+
+  const props = (this.selectedLineLayer as any)?.feature?.properties ?? {};
+  const id = props?.transport_line_id != null ? Number(props.transport_line_id) : null;
+
+  if (!id) {
+    alert('Puoi eliminare solo linee già salvate su DB.');
+    return;
+  }
+
+  // segna delete (vince su update)
+  this.lineDeletedDraft.add(id);
+  this.lineUpdatesDraft.delete(id);
+
+  // cache layer per undo
+  this.deletedLineLayersById.set(id, this.selectedLineLayer);
+
+  // sposta in ghost group + stile deleted
+  this.leafMapService.moveLineToDeleted(this.selectedLineLayer);
+
+  // reset selezione / metadati
+  this.clearLineSelection();
+  }
+
+
   restoreCurrentStop(): void {
     const st = this.editorState;
     if (!st || !st.layer) return;
@@ -1133,7 +1134,15 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     this.restoreLineStyle(this.selectedLineLayer);
     this.selectedLineLayer = null;
 
-    // 3) cancello tutti i draft update linee DB
+    for (const id of this.lineDeletedDraft.values()) {
+      this.restoreDeletedLineById(id);
+    } 
+// 3) cancello tutti i draft update linee DB
+    this.lineDeletedDraft.clear();
+    this.deletedLineLayersById.clear();
+
+
+    
     this.lineUpdatesDraft.clear();
 
     // 4) ripristino subito lo stile baseline di TUTTE le linee visibili in mappa
@@ -1167,8 +1176,6 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
     // 9) riallineo tool draw con UI
     this.syncDrawToolsWithUi();
-
-    alert('Modifiche linee (draft) resettate.');
   }
 
   //panel
@@ -1381,6 +1388,12 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
 
     const props = (layer as any)?.feature?.properties ?? {};
     const id = props?.transport_line_id != null ? Number(props.transport_line_id) : null;
+    
+    // ✅ se marcata delete, vince lo stile deleted
+    if (id != null && this.lineDeletedDraft.has(id)) {
+      this.leafMapService.setLineStyleDeleted(layer);
+      return;
+    }
 
     // ✅ override da draft update
     if (id != null && this.lineUpdatesDraft.has(id)) {
@@ -1478,53 +1491,37 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     this.syncDrawToolsWithUi();
   }
 
-  // private restoreLineEditCommitted(): void {
-  //   if (this.editorMode !== 'line-edit') return;
-
-  //   const edited = this.getEditedPolylineFromEditGroup();
-  //   if (!edited) return;
-
-  //   if (this.lineEditCommittedLatLngs && this.lineEditCommittedLatLngs.length >= 2) {
-  //     edited.setLatLngs(this.lineEditCommittedLatLngs);
-  //   }
-
-  //   if (this.lineEditCommittedMeta) {
-  //     this.lineNumber = this.lineEditCommittedMeta.number;
-  //     this.lineDirection = this.lineEditCommittedMeta.direction;
-  //     this.lineRoute = this.lineEditCommittedMeta.route;
-  //     this.lineColor = this.lineEditCommittedMeta.color;
-  //   }
-
-  //   edited.setStyle?.({ color: this.lineColor } as any);
-  // }
-
-  // restoreLineEditBaseline(): void {
-  //   if (this.editorMode !== 'line-edit') return;
-
-  //   const working = this.getEditedPolylineFromEditGroup();
-  //   if (!working) return;
-
-  //   // 1) ripristina shape
-  //   if (this.lineEditBaselineLatLngs && this.lineEditBaselineLatLngs.length >= 2) {
-  //     working.setLatLngs(this.lineEditBaselineLatLngs);
-  //   }
-
-  //   // 2) ripristina meta UI
-  //   if (this.lineEditBaselineMeta) {
-  //     this.lineNumber = this.lineEditBaselineMeta.number;
-  //     this.lineDirection = this.lineEditBaselineMeta.direction;
-  //     this.lineRoute = this.lineEditBaselineMeta.route;
-  //     this.lineColor = this.lineEditBaselineMeta.color;
-  //   }
-
-  //   // 3) applica subito colore sulla clone
-  //   working.setStyle?.({ color: this.lineColor } as any);
-  // }
-
   restoreLineEditBaseline(): void {
   if (this.editorMode !== 'line-edit') return;
   const restored = this.lineEditSession.restoreBaseline();
   this.applyLineEditState(restored);
+  }
+
+  restoreDeletedLineById(id: number): void {
+  const layer = this.deletedLineLayersById.get(id);
+  if (!layer) return;
+
+  this.leafMapService.restoreLineFromDeleted(layer);
+
+  this.lineDeletedDraft.delete(id);
+  this.deletedLineLayersById.delete(id);
+
+  // ripristina stile baseline/draft update
+  this.restoreLineStyle(layer);
+  }
+  restoreSelectedDeletedLine(): void {
+  if (this.editorMode === 'line-edit') return;
+  if (!this.selectedLineLayer) return;
+
+  const props = (this.selectedLineLayer as any)?.feature?.properties ?? {};
+  const id = props?.transport_line_id != null ? Number(props.transport_line_id) : null;
+  if (!id) return;
+
+  if (!this.lineDeletedDraft.has(id)) return;
+
+  this.restoreDeletedLineById(id);
+
+
   }
 
   onLineColorChanged(color: string): void {
@@ -1542,33 +1539,7 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
     }
   }
 
-  // private hasUnsavedLineEditChanges(): boolean {
-  //   if (this.editorMode !== 'line-edit') return false;
 
-  //   const edited = this.getEditedPolylineFromEditGroup();
-  //   if (!edited) return false;
-
-  //   const committedMeta = this.lineEditCommittedMeta;
-  //   const metaDirty =
-  //     !committedMeta ||
-  //     committedMeta.number !== this.lineNumber ||
-  //     committedMeta.direction !== this.lineDirection ||
-  //     committedMeta.route !== this.lineRoute ||
-  //     committedMeta.color !== this.lineColor;
-
-  //   const committedLatLngs = this.lineEditCommittedLatLngs ?? [];
-  //   const currLatLngs = (edited.getLatLngs() ?? []) as L.LatLng[];
-
-  //   const shapeDirty =
-  //     committedLatLngs.length !== currLatLngs.length ||
-  //     committedLatLngs.some((p, i) => {
-  //       const c = currLatLngs[i];
-  //       if (!c) return true;
-  //       return Math.abs(p.lat - c.lat) > 1e-10 || Math.abs(p.lng - c.lng) > 1e-10;
-  //     });
-
-  //   return metaDirty || shapeDirty;
-  // }
 
   private hasUnsavedLineEditChanges(): boolean {
   if (this.editorMode !== 'line-edit') return false;
@@ -1576,6 +1547,157 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
   if (!curr) return false;
   return this.lineEditSession.isDirty(curr);
   }
+
+  private latlngsToGeoJsonFeatureString(latlngs: L.LatLng[], color: string): string {
+    const coords = latlngs.map((p) => [p.lng, p.lat]);
+    const feature = {
+      type: 'Feature',
+      geometry: {
+        type: 'LineString',
+        coordinates: coords
+      },
+      properties: {
+        kind: 'line', color
+      }
+    };
+    return JSON.stringify(feature);
+  }
+
+  private buildCreateLineDtoOrNull(): any | null {
+  if (!this.lineDraftPolyline) return null;
+
+  const props = (this.lineDraftPolyline as any)?.feature?.properties ?? {};
+  if (props?.kind !== 'line-draft') return null;
+
+  // metadati obbligatori (1-based non c'entra: sono solo required)
+  if (!Number.isFinite(this.lineNumber as any) || !this.lineNumber) return null;
+  if (!this.lineDirection.trim() || !this.lineRoute.trim()) return null;
+
+  const latlngs = this.lineDraftPolyline.getLatLngs() as L.LatLng[];
+  if (!latlngs || latlngs.length < 2) return null;
+
+  const shapeGeoJson = this.latlngsToGeoJsonFeatureString(latlngs, this.lineColor);
+
+  // stopSequence 1-based: index + 1
+  if (!this.lineSelectedStops || this.lineSelectedStops.length < 2) return null;
+  const stops = this.lineSelectedStops.map((s, i) => ({
+    stopId: s.id,
+    stopSequence: i + 1,
+    shapeOffsetM: null
+  }));
+
+  return {
+    tempId: `tmp-line-${Date.now()}`,
+    number: this.lineNumber,
+    direction: this.lineDirection.trim(),
+    route: this.lineRoute.trim(),
+    shapeGeoJson,
+    stops
+  };
+}
+
+
+private async buildUpdateLineDto(id: number, d: any): Promise<any> {
+  const detail = await firstValueFrom(this.dataService.getLineWithStopsEditor(id));
+
+  const stops = (detail?.stops ?? []).map(s => ({
+    stopId: s.stopId,
+    stopSequence: s.stopSequence,     // 1-based dal backend
+    shapeOffsetM: s.shapeOffsetM ?? null
+  }));
+
+  if (stops.length < 2) {
+    throw new Error(`Linea ${id}: stops-editor ha meno di 2 stops.`);
+  }
+
+  const latlngs = (d.latlngs ?? []) as L.LatLng[];
+  if (!latlngs || latlngs.length < 2) {
+    throw new Error(`Linea ${id}: latlngs non validi nel draft update.`);
+  }
+
+  const shapeGeoJson = this.latlngsToGeoJsonFeatureString(latlngs, d.color);
+
+  return {
+    id,
+    number: d.number,
+    direction: (d.direction ?? '').trim(),
+    route: (d.route ?? '').trim(),
+    shapeGeoJson,
+    stops
+  };
+  }
+
+async saveAllLinesToDb(): Promise<void> {
+  // Se sei in edit, meglio evitare salvataggi "a metà"
+  if (this.editorMode === 'line-edit') {
+    alert('Esci dalla modalità modifica prima di salvare su DB.');
+    return;
+  }
+
+  const hasCreate = this.isDraftLineSaved();
+  const hasUpdates = this.lineUpdatesDraft.size > 0;
+  const hasDeletes = this.lineDeletedDraft.size > 0;
+
+  if (!hasCreate && !hasUpdates && !hasDeletes) {
+    alert('Nessuna modifica linee da salvare su DB.');
+    return;
+  }
+
+  const payload: LineBatchRequestDto = {
+    create: [],
+    update: [],
+    delete: []
+  };
+
+  // CREATE (se presente)
+  if (hasCreate) {
+    const c = this.buildCreateLineDtoOrNull();
+    if (!c) {
+      alert('Bozza linea non valida: compila metadati e almeno 2 fermate, poi salva in draft.');
+      return;
+    }
+    payload.create!.push(c);
+  }
+
+  // DELETE
+  if (hasDeletes) {
+    payload.delete = Array.from(this.lineDeletedDraft.values());
+  }
+
+  // UPDATE (richiede lookup stops-editor)
+  if (hasUpdates) {
+    for (const [id, d] of this.lineUpdatesDraft.entries()) {
+      try {
+        const u = await this.buildUpdateLineDto(id, d);
+        payload.update!.push(u);
+      } catch (e: any) {
+        console.error('Errore build update dto', id, e);
+        alert(e?.message ?? `Errore preparando update per linea ${id}.`);
+        return;
+      }
+    }
+  }
+
+  try {
+    const res = await firstValueFrom(this.dataService.applyLinesBatch(payload));
+    console.log('Lines batch saved:', res);
+
+    // pulizia draft locale (include ghost restore ecc.)
+    this.resetAllLineDraftChanges();
+
+    // ricarico mappe dal backend
+    this.linesGroup.clearLayers();
+    this.linesGeoLayer = undefined;
+
+    this.loadGeoAndRender();
+
+    alert('Linee salvate su DB.');
+  } catch (err: any) {
+    console.error('Errore applyLinesBatch:', err);
+    const msg = err?.error?.message ?? 'Errore durante il salvataggio linee su DB.';
+    alert(msg);
+  }
+}
 
   onExitLineEditRequested(): void {
     // se non ci sono modifiche non salvate, esci diretto
@@ -1615,29 +1737,22 @@ export class LeafletAdd implements AfterViewInit, OnDestroy {
   }
 
   get canSaveLineDraft(): boolean {
-  // metadati obbligatori
-  const numberOk = this.lineNumber != null && Number.isFinite(this.lineNumber) && this.lineNumber > 0;
-  const directionOk = (this.lineDirection ?? '').trim().length > 0;
-  const routeOk = (this.lineRoute ?? '').trim().length > 0;
+    // metadati obbligatori
+    const numberOk = this.lineNumber != null && Number.isFinite(this.lineNumber) && this.lineNumber > 0;
+    const directionOk = (this.lineDirection ?? '').trim().length > 0;
+    const routeOk = (this.lineRoute ?? '').trim().length > 0;
 
-  // almeno 2 stop selezionate
-  const stopsOk = this.lineSelectedStops.length >= 2;
+    // almeno 2 stop selezionate
+    const stopsOk = this.lineSelectedStops.length >= 2;
 
-  return numberOk && directionOk && routeOk && stopsOk;
-}
+    return numberOk && directionOk && routeOk && stopsOk;
+  }
 
-  // private markLineEditCommittedFromCurrent(): void {
-  //   const edited = this.getEditedPolylineFromEditGroup();
-  //   if (!edited) return;
+  get isSelectedLineDeleted(): boolean {
+    const props = (this.selectedLineLayer as any)?.feature?.properties ?? {};
+    const id = props?.transport_line_id != null ? Number(props.transport_line_id) : null;
+    return id != null && this.lineDeletedDraft.has(id);
+  }
 
-  //   this.lineEditCommittedMeta = {
-  //     number: this.lineNumber,
-  //     direction: this.lineDirection,
-  //     route: this.lineRoute,
-  //     color: this.lineColor,
-  //   };
 
-  //   const curr = (edited.getLatLngs() ?? []) as L.LatLng[];
-  //   this.lineEditCommittedLatLngs = curr.map((p) => L.latLng(p.lat, p.lng));
-  // }
 }

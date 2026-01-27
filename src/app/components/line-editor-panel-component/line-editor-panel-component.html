@@ -1,11 +1,23 @@
 <section class="dashboard">
-  <div class="badge">
-    Modifiche linee (draft): <strong>{{ pendingCount }}</strong>
-  </div>
 
+  <!-- ================= TOP ACTIONS ================= -->
   <div class="dashboard__actions">
-    <button mat-raised-button color="warn" (click)="resetAllLines.emit()" [disabled]="pendingCount === 0">
-      Reset modifiche linee
+    <button
+      mat-raised-button
+      color="primary"
+      (click)="saveAllDb.emit()"
+      [disabled]="pendingCount === 0 || mode === 'line-edit'"
+    >
+      Salva {{ pendingCount }} modifiche nel DB
+    </button>
+
+    <button
+      mat-raised-button
+      color="warn"
+      (click)="resetAllLines.emit()"
+      [disabled]="pendingCount === 0"
+    >
+      Reset modifiche ({{ pendingCount }})
     </button>
   </div>
 
@@ -70,15 +82,26 @@
         Esci da Modifica
       </button>
     } @else {
-      <!-- VIEW / CREATE -->
       <button
         mat-raised-button
         color="primary"
         (click)="enterEdit.emit()"
-        [disabled]="!hasSelectedLine || createOpen"
+        [disabled]="!hasSelectedLine || createOpen || isSelectedDeleted"
       >
         Modifica Linea
       </button>
+
+      @if (hasSelectedLine) {
+        @if (!isSelectedDeleted) {
+          <button mat-raised-button color="warn" (click)="deleteSelected.emit()" [disabled]="createOpen">
+            Elimina linea
+          </button>
+        } @else {
+          <button mat-raised-button (click)="restoreSelected.emit()" [disabled]="createOpen">
+            Ripristina linea
+          </button>
+        }
+      }
 
       @if (!createOpen) {
         <button mat-raised-button (click)="beginCreate.emit()">
@@ -101,7 +124,6 @@
     </div>
   } @else if (createOpen) {
 
-    <!-- ================= STOP SEARCH ================= -->
     <mat-form-field appearance="outline" class="dashboard__field">
       <mat-label>Cerca Stop</mat-label>
       <input
